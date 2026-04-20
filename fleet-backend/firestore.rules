@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users can only read/write their own document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Trucks — owner access only (enforced server-side via Admin SDK)
+    match /trucks/{truckId} {
+      allow read, write: if false; // All access via Admin SDK
+    }
+
+    // Drivers
+    match /drivers/{driverId} {
+      allow read, write: if false;
+    }
+
+    // Sensor data — write only via Admin SDK
+    match /sensorData/{sensorId} {
+      allow read, write: if false;
+    }
+
+    // Earnings
+    match /earnings/{earningId} {
+      allow read, write: if false;
+    }
+  }
+}
