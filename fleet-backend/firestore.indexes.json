@@ -4,7 +4,7 @@
       "collectionGroup": "trucks",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "ownerId", "order": "ASCENDING" },
+        { "fieldPath": "ownerId",   "order": "ASCENDING"  },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
@@ -13,14 +13,14 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "ownerId", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" }
+        { "fieldPath": "status",  "order": "ASCENDING" }
       ]
     },
     {
       "collectionGroup": "drivers",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "ownerId", "order": "ASCENDING" },
+        { "fieldPath": "ownerId",   "order": "ASCENDING"  },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
@@ -28,7 +28,7 @@
       "collectionGroup": "sensorData",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "truckId", "order": "ASCENDING" },
+        { "fieldPath": "truckId",    "order": "ASCENDING"  },
         { "fieldPath": "receivedAt", "order": "DESCENDING" }
       ]
     },
@@ -37,7 +37,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "ownerId", "order": "ASCENDING" },
-        { "fieldPath": "date", "order": "ASCENDING" }
+        { "fieldPath": "date",    "order": "ASCENDING" }
       ]
     }
   ],

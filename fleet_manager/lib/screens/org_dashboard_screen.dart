@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import '../utils/theme.dart';
 import '../models/models.dart';
+import '../models/org_models.dart';
+import '../services/api_service.dart';
+import '../services/auth_service.dart';
+import '../utils/theme.dart';
 import '../widgets/theme_toggle.dart';
-import 'profile_screen.dart';
+import 'org_profile_screen.dart';
+import 'home_screen.dart';
 
 class OrgDashboardScreen extends StatefulWidget {
   const OrgDashboardScreen({super.key});
@@ -13,46 +17,130 @@ class OrgDashboardScreen extends StatefulWidget {
 
 class _OrgDashboardScreenState extends State<OrgDashboardScreen>
     with TickerProviderStateMixin {
-  late AnimationController _staggerController;
-  final List<Animation<double>> _cardAnims = [];
-  int _selectedIndex = 0;
+  late AnimationController _staggerCtrl;
+  final List<Animation<double>> _anims = [];
+  final ScrollController _scrollCtrl = ScrollController();
+  int _tabIndex = 0;
 
-  final List<OrgTruckEntry> _incoming = [
-    OrgTruckEntry(plate: 'MH12 AB 1234', time: '10:30 AM', status: 'Arrived'),
-    OrgTruckEntry(plate: 'DL08 CD 5678', time: '11:15 AM', status: 'Waiting'),
-    OrgTruckEntry(plate: 'KA05 EF 9012', time: '12:00 PM', status: 'Unloading'),
-  ];
-
-  final List<OrgTruckEntry> _outgoing = [
-    OrgTruckEntry(plate: 'GJ01 GH 3456', time: '09:45 AM', status: 'Departed'),
-    OrgTruckEntry(plate: 'TN22 IJ 7890', time: '10:00 AM', status: 'Loading'),
-  ];
-
-  final List<ActivityEntry> _activity = [
-    ActivityEntry(message: 'Truck MH12 AB 1234 entered facility', time: '10:30 AM'),
-    ActivityEntry(message: 'Truck GJ01 GH 3456 departed', time: '09:45 AM'),
-    ActivityEntry(message: 'Truck KA05 EF 9012 started unloading', time: '09:30 AM'),
-    ActivityEntry(message: 'Truck DL08 CD 5678 arrived at gate', time: '09:00 AM'),
-  ];
+  // Data state
+  FleetSummary?    _summary;
+  List<OrgTruck>   _allTrucks = [];
+  bool   _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _staggerController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200));
-    for (int i = 0; i < 5; i++) {
-      _cardAnims.add(CurvedAnimation(
-        parent: _staggerController,
-        curve: Interval(i * 0.12, 0.6 + i * 0.08, curve: Curves.easeOutCubic),
+    _staggerCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1100));
+    for (int i = 0; i < 4; i++) {
+      _anims.add(CurvedAnimation(
+        parent: _staggerCtrl,
+        curve: Interval(i * 0.14, 0.6 + i * 0.1, curve: Curves.easeOutCubic),
       ));
     }
-    _staggerController.forward();
+    _loadAll();
   }
 
   @override
   void dispose() {
-    _staggerController.dispose();
+    _staggerCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadAll() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final results = await Future.wait([
+        ApiService.getFleetSummary(),
+        ApiService.getActiveTrucks(),
+      ]);
+
+      final summaryJson = results[0] as Map<String, dynamic>?;
+      final trucksJson  = results[1] as List<Map<String, dynamic>>;
+
+      FleetSummary?  summary = summaryJson != null ? FleetSummary.fromJson(summaryJson) : null;
+      List<OrgTruck> trucks  = trucksJson.map(OrgTruck.fromJson).toList();
+
+      // ── Demo fallback — shown when no real data exists yet ─────────────────
+      if (trucks.isEmpty) trucks = _demoTrucks();
+      if (summary == null || summary.totalTrucks == 0) summary = _demoSummary(trucks);
+      // ───────────────────────────────────────────────────────────────────────
+
+      if (!mounted) return;
+      setState(() {
+        _summary   = summary;
+        _allTrucks = trucks;
+        _loading   = false;
+      });
+      _staggerCtrl.reset();
+      _staggerCtrl.forward();
+    } catch (e) {
+      // On error show demo data
+      if (!mounted) return;
+      final trucks = _demoTrucks();
+      setState(() {
+        _summary   = _demoSummary(trucks);
+        _allTrucks = trucks;
+        _loading   = false;
+        _error     = null;
+      });
+      _staggerCtrl.reset();
+      _staggerCtrl.forward();
+    }
+  }
+
+  // ── Demo data ───────────────────────────────────────────────────────────────
+  static List<OrgTruck> _demoTrucks() => [
+    OrgTruck(truckId: 'd1', plate: 'MH12 AB 1234', model: 'Tata Prima 4928.S',
+        type: 'heavy', status: 'on_trip', lastLocation: 'Mumbai → Pune',
+        lastSeen: DateTime.now().subtract(const Duration(minutes: 5)),
+        sensor: SensorSnapshot(speed: 68, fuelLevel: 74, loadStatus: 'loaded', doorStatus: 'closed',
+            receivedAt: DateTime.now().subtract(const Duration(minutes: 5)))),
+    OrgTruck(truckId: 'd2', plate: 'DL08 CD 5678', model: 'Ashok Leyland 3518',
+        type: 'heavy', status: 'active', lastLocation: 'Delhi Hub',
+        lastSeen: DateTime.now().subtract(const Duration(minutes: 12)),
+        sensor: SensorSnapshot(speed: 0, fuelLevel: 88, loadStatus: 'empty', doorStatus: 'closed',
+            receivedAt: DateTime.now().subtract(const Duration(minutes: 12)))),
+    OrgTruck(truckId: 'd3', plate: 'KA05 EF 9012', model: 'Eicher Pro 6031',
+        type: 'medium', status: 'on_trip', lastLocation: 'Bangalore → Chennai',
+        lastSeen: DateTime.now().subtract(const Duration(minutes: 3)),
+        sensor: SensorSnapshot(speed: 72, fuelLevel: 55, loadStatus: 'partial', doorStatus: 'closed',
+            receivedAt: DateTime.now().subtract(const Duration(minutes: 3)))),
+    OrgTruck(truckId: 'd4', plate: 'GJ01 GH 3456', model: 'Tata LPT 3118',
+        type: 'light', status: 'active', lastLocation: 'Ahmedabad Depot',
+        lastSeen: DateTime.now().subtract(const Duration(minutes: 20)),
+        sensor: SensorSnapshot(speed: 0, fuelLevel: 91, loadStatus: 'empty', doorStatus: 'locked',
+            receivedAt: DateTime.now().subtract(const Duration(minutes: 20)))),
+    OrgTruck(truckId: 'd5', plate: 'TN22 IJ 7890', model: 'BharatBenz 3523R',
+        type: 'tanker', status: 'on_trip', lastLocation: 'Chennai → Coimbatore',
+        lastSeen: DateTime.now().subtract(const Duration(minutes: 8)),
+        sensor: SensorSnapshot(speed: 58, fuelLevel: 43, loadStatus: 'loaded', doorStatus: 'closed',
+            receivedAt: DateTime.now().subtract(const Duration(minutes: 8)))),
+  ];
+
+  static FleetSummary _demoSummary(List<OrgTruck> trucks) => FleetSummary(
+        totalTrucks:      trucks.length,
+        activeTrucks:     trucks.where((t) => t.isInside).length,
+        onTripTrucks:     trucks.where((t) => t.isIncoming).length,
+        idleTrucks:       0,
+        totalDrivers:     trucks.length,
+        availableDrivers: trucks.where((t) => t.isInside).length,
+      );
+
+  List<OrgTruck> get _incoming =>
+      _allTrucks.where((t) => t.isIncoming).toList();
+
+  List<OrgTruck> get _inside =>
+      _allTrucks.where((t) => t.isInside).toList();
+
+  List<OrgTruck> get _tabList => _tabIndex == 0 ? _incoming : _inside;
+
+  List<ActivityLog> get _activityLogs {
+    final logs = _allTrucks.map(ActivityLog.fromTruck).toList();
+    logs.sort((a, b) => b.time.compareTo(a.time));
+    return logs.take(10).toList();
   }
 
   @override
@@ -63,87 +151,162 @@ class _OrgDashboardScreenState extends State<OrgDashboardScreen>
       body: Container(
         decoration: BoxDecoration(gradient: c.backgroundGradient),
         child: SafeArea(
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(child: _buildHeader(context, c)),
-              SliverToBoxAdapter(child: _buildSummaryCards(c)),
-              SliverToBoxAdapter(child: _buildTabBar(c)),
-              SliverToBoxAdapter(child: _buildTabContent(c)),
-              SliverToBoxAdapter(child: _buildActivityFeed(c)),
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-            ],
-          ),
+          child: _loading
+              ? _buildLoader(c)
+              : _error != null
+                  ? _buildError(c)
+                  : _buildContent(c),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, FleetColors c) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      child: Row(
-        children: [
-          Builder(
-            builder: (ctx) => GestureDetector(
-              onTap: () => Scaffold.of(ctx).openDrawer(),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: c.iconBg,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: c.cardBorder),
-                ),
-                child: Icon(Icons.menu, color: c.text, size: 22),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Truck Movement',
-                    style: TextStyle(
-                        color: c.text,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900)),
-                Text('Organization Dashboard',
-                    style: TextStyle(color: c.textSub, fontSize: 13)),
-              ],
-            ),
-          ),
-          const ThemeToggle(),
-        ],
-      ),
-    );
-  }
+  // ── States ──────────────────────────────────────────────────────────────────
 
-  Widget _buildSummaryCards(FleetColors c) {
-    return _animated(
-      0,
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+  Widget _buildLoader(FleetColors c) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(color: AppColors.orangeStart),
+            const SizedBox(height: 16),
+            Text('Loading dashboard…',
+                style: TextStyle(color: c.textSub, fontSize: 14)),
+          ],
+        ),
+      );
+
+  Widget _buildError(FleetColors c) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_off_outlined, color: c.textSub, size: 48),
+              const SizedBox(height: 16),
+              Text('Could not load data',
+                  style: TextStyle(
+                      color: c.text, fontSize: 18, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(_error ?? 'Unknown error',
+                  style: TextStyle(color: c.textSub, fontSize: 13),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              _OrangeButton(label: 'Retry', onTap: _loadAll),
+            ],
+          ),
+        ),
+      );
+
+  Widget _buildContent(FleetColors c) => RefreshIndicator(
+        color: AppColors.orangeStart,
+        backgroundColor: c.surface,
+        onRefresh: _loadAll,
+        child: CustomScrollView(
+          controller: _scrollCtrl,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(child: _buildHeader(context, c)),
+            SliverToBoxAdapter(child: _buildSummaryRow(c)),
+            SliverToBoxAdapter(child: _buildTabBar(c)),
+            SliverToBoxAdapter(child: _buildTruckList(c)),
+            SliverToBoxAdapter(child: _buildActivityFeed(c)),
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          ],
+        ),
+      );
+
+  // ── Header ──────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader(BuildContext context, FleetColors c) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
         child: Row(
           children: [
-            Expanded(
-              child: _SummaryCard(
-                label: 'Total Today',
-                value: '${_incoming.length + _outgoing.length}',
-                icon: Icons.local_shipping,
-                color: AppColors.orangeStart,
-                c: c,
+            Builder(
+              builder: (ctx) => GestureDetector(
+                onTap: () => Scaffold.of(ctx).openDrawer(),
+                child: _IconBox(icon: Icons.menu, c: c),
               ),
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: _SummaryCard(
-                label: 'Inside Facility',
-                value: '${_incoming.where((t) => t.status != 'Departed').length}',
-                icon: Icons.warehouse_outlined,
-                color: AppColors.blue,
-                c: c,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Truck Movement',
+                      style: TextStyle(
+                          color: c.text,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900)),
+                  Text('Organization Dashboard',
+                      style: TextStyle(color: c.textSub, fontSize: 13)),
+                ],
               ),
+            ),
+            const ThemeToggle(),
+          ],
+        ),
+      );
+
+  // ── Summary Cards ────────────────────────────────────────────────────────────
+
+  Widget _buildSummaryRow(FleetColors c) {
+    final total   = _summary?.totalTrucks ?? _allTrucks.length;
+    final inside  = _summary?.trucksInsideFacility ?? _inside.length;
+    final onTrip  = _summary?.onTripTrucks ?? _incoming.length;
+    final drivers = _summary?.availableDrivers ?? 0;
+
+    return _Animated(
+      anim: _anims[0],
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _SummaryCard(
+                    label: 'Total Trucks',
+                    value: '$total',
+                    icon: Icons.local_shipping,
+                    color: AppColors.orangeStart,
+                    c: c,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: _SummaryCard(
+                    label: 'Inside Facility',
+                    value: '$inside',
+                    icon: Icons.warehouse_outlined,
+                    color: AppColors.blue,
+                    c: c,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _SummaryCard(
+                    label: 'On Trip',
+                    value: '$onTrip',
+                    icon: Icons.route,
+                    color: AppColors.green,
+                    c: c,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: _SummaryCard(
+                    label: 'Drivers Available',
+                    value: '$drivers',
+                    icon: Icons.person_outline,
+                    color: AppColors.purple,
+                    c: c,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -151,49 +314,70 @@ class _OrgDashboardScreenState extends State<OrgDashboardScreen>
     );
   }
 
-  Widget _buildTabBar(FleetColors c) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: c.surfaceHigh,
-          borderRadius: BorderRadius.circular(16),
+  // ── Tab Bar ──────────────────────────────────────────────────────────────────
+
+  Widget _buildTabBar(FleetColors c) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: c.surfaceHigh,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              _Tab(
+                label: 'Incoming (${_incoming.length})',
+                selected: _tabIndex == 0,
+                onTap: () => setState(() => _tabIndex = 0),
+                c: c,
+              ),
+              _Tab(
+                label: 'Inside (${_inside.length})',
+                selected: _tabIndex == 1,
+                onTap: () => setState(() => _tabIndex = 1),
+                c: c,
+              ),
+            ],
+          ),
         ),
-        child: Row(
-          children: [
-            _Tab(label: 'Incoming', selected: _selectedIndex == 0,
-                onTap: () => setState(() => _selectedIndex = 0), c: c),
-            _Tab(label: 'Outgoing', selected: _selectedIndex == 1,
-                onTap: () => setState(() => _selectedIndex = 1), c: c),
-          ],
-        ),
+      );
+
+  // ── Truck List ───────────────────────────────────────────────────────────────
+
+  Widget _buildTruckList(FleetColors c) {
+    final list = _tabList;
+    return _Animated(
+      anim: _anims[1],
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: list.isEmpty
+            ? _EmptyCard(
+                icon: Icons.local_shipping_outlined,
+                message: _tabIndex == 0
+                    ? 'No trucks currently on trip'
+                    : 'No trucks inside facility',
+                c: c,
+              )
+            : Column(
+                children: list
+                    .map((t) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _TruckCard(truck: t, c: c),
+                        ))
+                    .toList(),
+              ),
       ),
     );
   }
 
-  Widget _buildTabContent(FleetColors c) {
-    final list = _selectedIndex == 0 ? _incoming : _outgoing;
-    return _animated(
-      1,
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        child: Column(
-          children: list
-              .map((entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _TruckEntryCard(entry: entry, c: c),
-                  ))
-              .toList(),
-        ),
-      ),
-    );
-  }
+  // ── Activity Feed ────────────────────────────────────────────────────────────
 
   Widget _buildActivityFeed(FleetColors c) {
-    return _animated(
-      2,
-      Padding(
+    final logs = _activityLogs;
+    return _Animated(
+      anim: _anims[2],
+      child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: Container(
           padding: const EdgeInsets.all(20),
@@ -224,7 +408,17 @@ class _OrgDashboardScreenState extends State<OrgDashboardScreen>
                 ],
               ),
               const SizedBox(height: 16),
-              ..._activity.map((a) => _ActivityItem(entry: a, c: c)),
+              if (logs.isEmpty)
+                _EmptyCard(
+                    icon: Icons.history_toggle_off,
+                    message: 'No recent activity',
+                    c: c)
+              else
+                ...logs.asMap().entries.map((e) => _ActivityRow(
+                      log: e.value,
+                      isLast: e.key == logs.length - 1,
+                      c: c,
+                    )),
             ],
           ),
         ),
@@ -232,69 +426,59 @@ class _OrgDashboardScreenState extends State<OrgDashboardScreen>
     );
   }
 
+  // ── Drawer ──────────────────────────────────────────────────────────────────
+
   Widget _buildDrawer(BuildContext context, FleetColors c) {
+    final profile = AppStore.profile;
     return Drawer(
       backgroundColor: c.sheetBg,
       child: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: AppColors.orangeStart.withOpacity(0.2),
-                    child: Text(AppStore.profile.avatarInitials,
-                        style: const TextStyle(
-                            color: AppColors.orangeStart,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800)),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(AppStore.profile.name,
-                            style: TextStyle(
-                                color: c.text,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700)),
-                        Text('Organization',
-                            style: TextStyle(color: c.textSub, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _DrawerHeader(profile: profile, role: 'Organization', c: c),
             Divider(color: c.divider, height: 1),
             _DrawerItem(
                 icon: Icons.dashboard_outlined,
                 label: 'Dashboard',
-                onTap: () => Navigator.pop(context),
-                c: c),
-            _DrawerItem(
-                icon: Icons.arrow_downward,
-                label: 'Incoming Trucks',
                 onTap: () {
                   Navigator.pop(context);
-                  setState(() => _selectedIndex = 0);
+                  _scrollCtrl.animateTo(0,
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeOut);
                 },
                 c: c),
             _DrawerItem(
-                icon: Icons.arrow_upward,
-                label: 'Outgoing Trucks',
+                icon: Icons.arrow_circle_down_outlined,
+                label: 'Incoming Trucks',
                 onTap: () {
                   Navigator.pop(context);
-                  setState(() => _selectedIndex = 1);
+                  setState(() => _tabIndex = 0);
+                  _scrollCtrl.animateTo(320,
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeOut);
+                },
+                c: c),
+            _DrawerItem(
+                icon: Icons.arrow_circle_up_outlined,
+                label: 'Inside Facility',
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() => _tabIndex = 1);
+                  _scrollCtrl.animateTo(320,
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeOut);
                 },
                 c: c),
             _DrawerItem(
                 icon: Icons.history,
-                label: 'Logs / History',
-                onTap: () => Navigator.pop(context),
+                label: 'Activity Feed',
+                onTap: () {
+                  Navigator.pop(context);
+                  _scrollCtrl.animateTo(
+                      _scrollCtrl.position.maxScrollExtent,
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeOut);
+                },
                 c: c),
             _DrawerItem(
                 icon: Icons.person_outline,
@@ -302,7 +486,8 @@ class _OrgDashboardScreenState extends State<OrgDashboardScreen>
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const ProfileScreen()));
+                      MaterialPageRoute(
+                          builder: (_) => const OrgProfileScreen()));
                 },
                 c: c),
             const Spacer(),
@@ -310,10 +495,16 @@ class _OrgDashboardScreenState extends State<OrgDashboardScreen>
             _DrawerItem(
                 icon: Icons.logout,
                 label: 'Logout',
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(context);
-                  Navigator.pushNamedAndRemoveUntil(
-                      context, '/home', (_) => false);
+                  await AuthService.signOut();
+                  if (!mounted) return;
+                  // ignore: use_build_context_synchronously
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const HomeScreen()),
+                    (_) => false,
+                  );
                 },
                 c: c,
                 isDestructive: true),
@@ -323,36 +514,26 @@ class _OrgDashboardScreenState extends State<OrgDashboardScreen>
       ),
     );
   }
-
-  Widget _animated(int index, Widget child) {
-    return AnimatedBuilder(
-      animation: _cardAnims[index],
-      builder: (_, __) => Opacity(
-        opacity: _cardAnims[index].value,
-        child: Transform.translate(
-          offset: Offset(0, 30 * (1 - _cardAnims[index].value)),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Data models ──────────────────────────────────────────────────────────────
-class OrgTruckEntry {
-  final String plate;
-  final String time;
-  final String status;
-  OrgTruckEntry({required this.plate, required this.time, required this.status});
-}
-
-class ActivityEntry {
-  final String message;
-  final String time;
-  ActivityEntry({required this.message, required this.time});
 }
 
 // ─── Widgets ──────────────────────────────────────────────────────────────────
+
+class _Animated extends StatelessWidget {
+  final Animation<double> anim;
+  final Widget child;
+  const _Animated({required this.anim, required this.child});
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: anim,
+        builder: (_, __) => Opacity(
+          opacity: anim.value,
+          child: Transform.translate(
+              offset: Offset(0, 28 * (1 - anim.value)), child: child),
+        ),
+      );
+}
+
 class _SummaryCard extends StatelessWidget {
   final String label;
   final String value;
@@ -368,35 +549,41 @@ class _SummaryCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: c.cardBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: c.cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: c.cardBg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: c.cardBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 20),
             ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(height: 12),
-          Text(value,
-              style: TextStyle(
-                  color: c.text, fontSize: 28, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(color: c.textSub, fontSize: 13)),
-        ],
-      ),
-    );
-  }
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(value,
+                      style: TextStyle(
+                          color: c.text,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900)),
+                  Text(label,
+                      style: TextStyle(color: c.textSub, fontSize: 11)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 class _Tab extends StatelessWidget {
@@ -404,56 +591,48 @@ class _Tab extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final FleetColors c;
-  const _Tab(
-      {required this.label,
-      required this.selected,
-      required this.onTap,
-      required this.c});
+  const _Tab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.c,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            gradient: selected ? AppColors.orangeGradient : null,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-            child: Text(label,
-                style: TextStyle(
-                    color: selected ? Colors.white : c.textSub,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14)),
+  Widget build(BuildContext context) => Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              gradient: selected ? AppColors.orangeGradient : null,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Text(label,
+                  style: TextStyle(
+                      color: selected ? Colors.white : c.textSub,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13)),
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
 }
 
-class _TruckEntryCard extends StatelessWidget {
-  final OrgTruckEntry entry;
+class _TruckCard extends StatelessWidget {
+  final OrgTruck truck;
   final FleetColors c;
-  const _TruckEntryCard({required this.entry, required this.c});
+  const _TruckCard({required this.truck, required this.c});
 
   Color _statusColor() {
-    switch (entry.status) {
-      case 'Arrived':
-        return AppColors.green;
-      case 'Waiting':
-        return AppColors.amber;
-      case 'Unloading':
-        return AppColors.blue;
-      case 'Loading':
-        return AppColors.purple;
-      case 'Departed':
-        return AppColors.red;
-      default:
-        return AppColors.green;
+    switch (truck.status) {
+      case 'on_trip':     return AppColors.green;
+      case 'active':      return AppColors.blue;
+      case 'idle':        return AppColors.amber;
+      case 'maintenance': return AppColors.red;
+      default:            return AppColors.amber;
     }
   }
 
@@ -467,56 +646,130 @@ class _TruckEntryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.cardBorder),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.local_shipping, color: color, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(entry.plate,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.local_shipping, color: color, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(truck.plate,
+                        style: TextStyle(
+                            color: c.text,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700)),
+                    if (truck.model != null)
+                      Text(truck.model!,
+                          style: TextStyle(color: c.textSub, fontSize: 12)),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: color.withOpacity(0.3)),
+                ),
+                child: Text(truck.displayStatus,
                     style: TextStyle(
-                        color: c.text,
-                        fontSize: 15,
+                        color: color,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text(entry.time,
-                    style: TextStyle(color: c.textSub, fontSize: 13)),
+              ),
+            ],
+          ),
+          if (truck.sensor != null) ...[
+            const SizedBox(height: 12),
+            Divider(color: c.divider, height: 1),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (truck.sensor!.speed != null)
+                  _SensorChip(
+                    icon: Icons.speed,
+                    label: '${truck.sensor!.speed!.toStringAsFixed(0)} km/h',
+                    c: c,
+                  ),
+                if (truck.sensor!.fuelLevel != null) ...[
+                  const SizedBox(width: 8),
+                  _SensorChip(
+                    icon: Icons.local_gas_station,
+                    label: '${truck.sensor!.fuelLevel!.toStringAsFixed(0)}%',
+                    c: c,
+                  ),
+                ],
+                if (truck.sensor!.doorStatus != null) ...[
+                  const SizedBox(width: 8),
+                  _SensorChip(
+                    icon: Icons.door_back_door_outlined,
+                    label: truck.sensor!.doorStatus!,
+                    c: c,
+                  ),
+                ],
               ],
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: color.withOpacity(0.3)),
-            ),
-            child: Text(entry.status,
-                style: TextStyle(
-                    color: color, fontSize: 12, fontWeight: FontWeight.w700)),
-          ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _ActivityItem extends StatelessWidget {
-  final ActivityEntry entry;
+class _SensorChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
   final FleetColors c;
-  const _ActivityItem({required this.entry, required this.c});
+  const _SensorChip({required this.icon, required this.label, required this.c});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: c.surfaceHigh,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: c.textSub, size: 12),
+            const SizedBox(width: 4),
+            Text(label, style: TextStyle(color: c.textSub, fontSize: 11)),
+          ],
+        ),
+      );
+}
+
+class _ActivityRow extends StatelessWidget {
+  final ActivityLog log;
+  final bool isLast;
+  final FleetColors c;
+  const _ActivityRow(
+      {required this.log, required this.isLast, required this.c});
+
+  Color _dotColor() {
+    switch (log.type) {
+      case ActivityType.arrival:   return AppColors.green;
+      case ActivityType.departure: return AppColors.red;
+      case ActivityType.movement:  return AppColors.orangeStart;
+      case ActivityType.idle:      return AppColors.amber;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final dot = _dotColor();
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -527,12 +780,14 @@ class _ActivityItem extends StatelessWidget {
               Container(
                 width: 8,
                 height: 8,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: AppColors.orangeGradient,
-                ),
+                decoration: BoxDecoration(
+                    shape: BoxShape.circle, color: dot),
               ),
-              Container(width: 1, height: 28, color: AppColors.orangeStart.withOpacity(0.3)),
+              if (!isLast)
+                Container(
+                    width: 1,
+                    height: 28,
+                    color: dot.withOpacity(0.25)),
             ],
           ),
           const SizedBox(width: 12),
@@ -540,11 +795,13 @@ class _ActivityItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(entry.message,
+                Text(log.message,
                     style: TextStyle(
-                        color: c.text, fontSize: 13, fontWeight: FontWeight.w500)),
+                        color: c.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500)),
                 const SizedBox(height: 2),
-                Text(entry.time,
+                Text(log.formattedTime,
                     style: TextStyle(color: c.textSub, fontSize: 11)),
               ],
             ),
@@ -553,6 +810,115 @@ class _ActivityItem extends StatelessWidget {
       ),
     );
   }
+}
+
+class _EmptyCard extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  final FleetColors c;
+  const _EmptyCard(
+      {required this.icon, required this.message, required this.c});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: c.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: c.cardBorder),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: c.textSub, size: 28),
+            const SizedBox(width: 14),
+            Text(message,
+                style: TextStyle(color: c.textSub, fontSize: 14)),
+          ],
+        ),
+      );
+}
+
+class _OrangeButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _OrangeButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: AppColors.orangeGradient,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(label,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15)),
+        ),
+      );
+}
+
+class _IconBox extends StatelessWidget {
+  final IconData icon;
+  final FleetColors c;
+  const _IconBox({required this.icon, required this.c});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: c.iconBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: c.cardBorder),
+        ),
+        child: Icon(icon, color: c.text, size: 22),
+      );
+}
+
+class _DrawerHeader extends StatelessWidget {
+  final UserProfile profile;
+  final String role;
+  final FleetColors c;
+  const _DrawerHeader(
+      {required this.profile, required this.role, required this.c});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: AppColors.orangeStart.withOpacity(0.2),
+              child: Text(profile.avatarInitials,
+                  style: const TextStyle(
+                      color: AppColors.orangeStart,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(profile.name,
+                      style: TextStyle(
+                          color: c.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700),
+                      overflow: TextOverflow.ellipsis),
+                  Text(role,
+                      style: TextStyle(color: c.textSub, fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 class _DrawerItem extends StatelessWidget {

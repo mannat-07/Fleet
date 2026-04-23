@@ -9,7 +9,7 @@ class FleetBackButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = FleetTheme.of(context).colors;
     return GestureDetector(
-      onTap: () => Navigator.pop(context),
+      onTap: () => Navigator.maybePop(context),
       child: Container(
         width: 40, height: 40,
         decoration: BoxDecoration(

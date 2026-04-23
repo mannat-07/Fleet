@@ -1,9 +1,12 @@
-const jwt = require('jsonwebtoken');
+const jwt   = require('jsonwebtoken');
+const admin = require('firebase-admin');
 const { getDb, COLLECTIONS } = require('../config/firebase');
 const { unauthorized, forbidden } = require('../utils/response');
 
 /**
- * Verify JWT and attach user to req.user
+ * Verify token — supports both:
+ *   1. Firebase ID tokens (issued by Firebase Auth, used by Flutter clients)
+ *   2. Custom JWTs (issued by this backend's /api/auth/login)
  */
 async function authenticate(req, res, next) {
   try {
@@ -13,22 +16,51 @@ async function authenticate(req, res, next) {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let uid, email, role;
 
-    // Fetch fresh user from Firestore to ensure account still active
-    const db = getDb();
-    const userDoc = await db.collection(COLLECTIONS.USERS).doc(decoded.uid).get();
+    // ── Try Firebase ID token first ──────────────────────────────────────────
+    try {
+      const decoded = await admin.auth().verifyIdToken(token);
+      uid   = decoded.uid;
+      email = decoded.email || '';
 
-    if (!userDoc.exists) return unauthorized(res, 'User not found');
+      // Load role from Firestore users collection
+      const db      = getDb();
+      const userDoc = await db.collection(COLLECTIONS.USERS).doc(uid).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        if (userData.disabled) return forbidden(res, 'Account disabled');
+        role = userData.role || 'owner';
+      } else {
+        // User exists in Firebase Auth but not yet in Firestore — treat as owner
+        role = 'owner';
+      }
 
-    const user = userDoc.data();
-    if (user.disabled) return forbidden(res, 'Account disabled');
+      req.user = { uid, email, role };
+      return next();
+    } catch (firebaseErr) {
+      // Not a Firebase token — fall through to custom JWT
+    }
 
-    req.user = { uid: decoded.uid, email: user.email, role: user.role || 'owner' };
-    next();
+    // ── Try custom JWT ───────────────────────────────────────────────────────
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      uid = decoded.uid;
+
+      const db      = getDb();
+      const userDoc = await db.collection(COLLECTIONS.USERS).doc(uid).get();
+      if (!userDoc.exists) return unauthorized(res, 'User not found');
+
+      const user = userDoc.data();
+      if (user.disabled) return forbidden(res, 'Account disabled');
+
+      req.user = { uid, email: user.email, role: user.role || 'owner' };
+      return next();
+    } catch (jwtErr) {
+      if (jwtErr.name === 'TokenExpiredError') return unauthorized(res, 'Token expired');
+      return unauthorized(res, 'Invalid token');
+    }
   } catch (err) {
-    if (err.name === 'TokenExpiredError') return unauthorized(res, 'Token expired');
-    if (err.name === 'JsonWebTokenError')  return unauthorized(res, 'Invalid token');
     next(err);
   }
 }
@@ -45,7 +77,7 @@ function authenticateDevice(req, res, next) {
 }
 
 /**
- * Role-based access (optional)
+ * Role-based access guard
  */
 function requireRole(...roles) {
   return (req, res, next) => {

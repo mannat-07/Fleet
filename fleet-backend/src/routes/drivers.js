@@ -6,11 +6,16 @@ const ctrl = require('../controllers/driverController');
 
 router.use(authenticate);
 
+// GET /api/drivers/me  — driver fetches their own data (must be before /:driverId)
+router.get('/me', ctrl.getMyProfile);
+
 // POST /api/drivers
 router.post('/',
   [
     body('name').trim().notEmpty().withMessage('Driver name is required'),
-    body('phone').optional().isMobilePhone(),
+    body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+    body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+    body('phone').optional(),
     body('licenseNumber').optional().trim(),
     body('licenseExpiry').optional().isISO8601().withMessage('licenseExpiry must be a valid date'),
   ],
@@ -26,6 +31,13 @@ router.get('/:driverId',
   [param('driverId').notEmpty()],
   validate,
   ctrl.getDriver
+);
+
+// DELETE /api/drivers/:driverId
+router.delete('/:driverId',
+  [param('driverId').notEmpty()],
+  validate,
+  ctrl.deleteDriver
 );
 
 // POST /api/drivers/:driverId/assign

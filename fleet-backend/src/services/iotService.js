@@ -99,16 +99,35 @@ async function ingestSensorData(payload) {
 }
 
 /**
- * Get latest sensor reading for a truck
+ * Get latest sensor reading for a truck.
+ * Falls back gracefully if the composite index doesn't exist yet.
  */
 async function getLatestSensorData(truckId) {
-  const db   = getDb();
-  const snap = await db.collection(COLLECTIONS.SENSOR_DATA)
-    .where('truckId', '==', truckId)
-    .orderBy('receivedAt', 'desc')
-    .limit(1)
-    .get();
-  return snap.empty ? null : snap.docs[0].data();
+  const db = getDb();
+  try {
+    const snap = await db.collection(COLLECTIONS.SENSOR_DATA)
+      .where('truckId', '==', truckId)
+      .orderBy('receivedAt', 'desc')
+      .limit(1)
+      .get();
+    return snap.empty ? null : snap.docs[0].data();
+  } catch (err) {
+    // Index not yet created — try fetching without orderBy and sort in-memory
+    if (err.code === 9 || (err.message && err.message.includes('FAILED_PRECONDITION'))) {
+      const snap = await db.collection(COLLECTIONS.SENSOR_DATA)
+        .where('truckId', '==', truckId)
+        .limit(20)
+        .get();
+      if (snap.empty) return null;
+      const docs = snap.docs.map(d => d.data()).sort((a, b) => {
+        const ta = a.receivedAt?.toMillis?.() ?? 0;
+        const tb = b.receivedAt?.toMillis?.() ?? 0;
+        return tb - ta;
+      });
+      return docs[0] ?? null;
+    }
+    throw err;
+  }
 }
 
 /**

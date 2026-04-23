@@ -38,23 +38,30 @@ async function getFleetSummary(ownerId) {
  */
 async function getActiveTrucks(ownerId) {
   const db   = getDb();
+  // Fetch all owner trucks without compound filter to avoid index requirement.
+  // Filter active/on_trip in-memory.
   const snap = await db.collection(COLLECTIONS.TRUCKS)
     .where('ownerId', '==', ownerId)
-    .where('status', 'in', ['active', 'on_trip'])
     .get();
 
-  const trucks = snap.docs.map(d => d.data());
+  const trucks = snap.docs
+    .map(d => d.data())
+    .filter(t => t.status === 'active' || t.status === 'on_trip');
 
   // Attach latest sensor reading for each
   const enriched = await Promise.all(
     trucks.map(async (truck) => {
-      const sensorSnap = await db.collection(COLLECTIONS.SENSOR_DATA)
-        .where('truckId', '==', truck.truckId)
-        .orderBy('receivedAt', 'desc')
-        .limit(1)
-        .get();
-      const latest = sensorSnap.empty ? null : sensorSnap.docs[0].data();
-      return { ...truck, latestSensor: latest };
+      try {
+        const sensorSnap = await db.collection(COLLECTIONS.SENSOR_DATA)
+          .where('truckId', '==', truck.truckId)
+          .orderBy('receivedAt', 'desc')
+          .limit(1)
+          .get();
+        const latest = sensorSnap.empty ? null : sensorSnap.docs[0].data();
+        return { ...truck, latestSensor: latest };
+      } catch (_) {
+        return { ...truck, latestSensor: null };
+      }
     })
   );
 
@@ -76,19 +83,31 @@ async function getEarningsSummary(ownerId, period = 'monthly') {
     default:        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
   }
 
+  // Single-field query — no composite index needed.
+  // Filter by date range and sort in-memory.
   const snap = await db.collection(COLLECTIONS.EARNINGS)
     .where('ownerId', '==', ownerId)
-    .where('date', '>=', admin.firestore.Timestamp.fromDate(startDate))
-    .orderBy('date', 'asc')
     .get();
 
-  const records = snap.docs.map(d => d.data());
-  const total   = records.reduce((sum, r) => sum + (r.amount || 0), 0);
+  const startMs = startDate.getTime();
 
-  // Group by day for chart data
+  const records = snap.docs
+    .map(d => d.data())
+    .filter(r => {
+      const ms = r.date?.toMillis?.() ?? r.date?.toDate?.()?.getTime?.() ?? 0;
+      return ms >= startMs;
+    })
+    .sort((a, b) => {
+      const ta = a.date?.toMillis?.() ?? 0;
+      const tb = b.date?.toMillis?.() ?? 0;
+      return ta - tb;
+    });
+
+  const total = records.reduce((sum, r) => sum + (r.amount || 0), 0);
+
   const byDay = {};
   records.forEach(r => {
-    const day = r.date?.toDate?.()?.toISOString?.().split('T')[0] || 'unknown';
+    const day = r.date?.toDate?.()?.toISOString?.().split('T')[0] ?? 'unknown';
     byDay[day] = (byDay[day] || 0) + (r.amount || 0);
   });
 

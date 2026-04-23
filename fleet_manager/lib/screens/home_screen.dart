@@ -147,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       builder: (_, child) => Opacity(opacity: _fadeAnim.value, child: child),
                       child: CustomButton(
                         label: 'Get Started',
-                        onPressed: () => Navigator.pushReplacement(context, PageRouteBuilder(
+                        onPressed: () => Navigator.push(context, PageRouteBuilder(
                           pageBuilder: (_, a, __) => const LoginScreen(),
                           transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
                           transitionDuration: const Duration(milliseconds: 500),

@@ -203,10 +203,18 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildStats(FleetColors c) {
+    // Stats come from AppStore which is populated by API calls in sub-screens
+    final truckCount  = AppStore.trucks.length;
+    final driverCount = AppStore.drivers.length;
+    final activeCount = AppStore.trucks
+        .where((t) => t.status == 'Active' || t.status == 'active' ||
+                      t.status == 'On Trip' || t.status == 'on_trip')
+        .length;
+
     final stats = [
-      _Stat('Trucks',  '${AppStore.trucks.length}',  Icons.local_shipping,  AppColors.orangeStart),
-      _Stat('Drivers', '${AppStore.drivers.length}', Icons.people,          AppColors.blue),
-      _Stat('Active',  '${AppStore.trucks.where((t) => t.status == 'Active' || t.status == 'On Trip').length}', Icons.check_circle_outline, AppColors.green),
+      _Stat('Trucks',  '$truckCount',  Icons.local_shipping,  AppColors.orangeStart),
+      _Stat('Drivers', '$driverCount', Icons.people,          AppColors.blue),
+      _Stat('Active',  '$activeCount', Icons.check_circle_outline, AppColors.green),
     ];
 
     return Padding(

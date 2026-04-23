@@ -36,11 +36,18 @@ async function addTruck({ ownerId, plate, model, type, year }) {
 
 async function getTrucks(ownerId) {
   const db   = getDb();
+  // Fetch without orderBy to avoid requiring a composite index.
+  // Sort in-memory by createdAt descending.
   const snap = await db.collection(COLLECTIONS.TRUCKS)
     .where('ownerId', '==', ownerId)
-    .orderBy('createdAt', 'desc')
     .get();
-  return snap.docs.map(d => d.data());
+  return snap.docs
+    .map(d => d.data())
+    .sort((a, b) => {
+      const ta = a.createdAt?.toMillis?.() ?? 0;
+      const tb = b.createdAt?.toMillis?.() ?? 0;
+      return tb - ta;
+    });
 }
 
 async function getTruckById(truckId, ownerId) {
