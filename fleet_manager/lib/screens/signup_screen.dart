@@ -7,6 +7,8 @@ import '../widgets/glass_card.dart';
 import '../widgets/back_button_widget.dart';
 import '../widgets/theme_toggle.dart';
 import 'dashboard_screen.dart';
+import 'driver_dashboard_screen.dart';
+import 'org_dashboard_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -25,8 +27,11 @@ class _SignupScreenState extends State<SignupScreen>
   final _emailCtrl   = TextEditingController();
   final _passCtrl    = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  String  _selectedRole = 'Fleet Owner';
   bool    _loading   = false;
   String? _error;
+
+  static const _roles = ['Fleet Owner', 'Driver', 'Organization'];
 
   @override
   void initState() {
@@ -47,13 +52,20 @@ class _SignupScreenState extends State<SignupScreen>
     super.dispose();
   }
 
+  String _roleToFirestore(String role) {
+    switch (role) {
+      case 'Driver':       return 'driver';
+      case 'Organization': return 'organization';
+      default:             return 'owner';
+    }
+  }
+
   Future<void> _signup() async {
     final name    = _nameCtrl.text.trim();
     final email   = _emailCtrl.text.trim();
     final pass    = _passCtrl.text;
     final confirm = _confirmCtrl.text;
 
-    // Client-side validation first — no network needed
     if (name.isEmpty || email.isEmpty || pass.isEmpty || confirm.isEmpty) {
       setState(() => _error = 'All fields are required.');
       return;
@@ -74,15 +86,29 @@ class _SignupScreenState extends State<SignupScreen>
     setState(() { _loading = true; _error = null; });
 
     try {
-      await AuthService.signUp(name: name, email: email, password: pass);
+      await AuthService.signUp(
+        name: name,
+        email: email,
+        password: pass,
+        role: _roleToFirestore(_selectedRole),
+      );
 
       if (!mounted) return;
       setState(() => _loading = false);
 
+      Widget destination;
+      if (_selectedRole == 'Driver') {
+        destination = const DriverDashboardScreen();
+      } else if (_selectedRole == 'Organization') {
+        destination = const OrgDashboardScreen();
+      } else {
+        destination = const DashboardScreen();
+      }
+
       Navigator.pushAndRemoveUntil(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, a, __) => const DashboardScreen(),
+          pageBuilder: (_, a, __) => destination,
           transitionsBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 500),
@@ -141,6 +167,7 @@ class _SignupScreenState extends State<SignupScreen>
                     GlassCard(
                       padding: const EdgeInsets.all(24),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           GlassInput(
                             hint: 'Full Name',
@@ -168,6 +195,55 @@ class _SignupScreenState extends State<SignupScreen>
                             obscure: true,
                             controller: _confirmCtrl,
                           ),
+                          const SizedBox(height: 20),
+
+                          // ── Role selector ──────────────────────────────────
+                          Text('I am a',
+                              style: TextStyle(
+                                  color: c.textSub,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: _roles.map((role) {
+                              final selected = _selectedRole == role;
+                              return Expanded(
+                                child: GestureDetector(
+                                  onTap: () =>
+                                      setState(() => _selectedRole = role),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    margin: EdgeInsets.only(
+                                        right: role != _roles.last ? 8 : 0),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 10),
+                                    decoration: BoxDecoration(
+                                      gradient: selected
+                                          ? AppColors.orangeGradient
+                                          : null,
+                                      color: selected ? null : c.surfaceHigh,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: selected
+                                            ? Colors.transparent
+                                            : c.cardBorder,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(role,
+                                          style: TextStyle(
+                                              color: selected
+                                                  ? Colors.white
+                                                  : c.textSub,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700)),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+
                           const SizedBox(height: 24),
                           CustomButton(
                             label: 'Create Account',

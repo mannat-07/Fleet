@@ -12,7 +12,7 @@ function generateToken(uid) {
   });
 }
 
-async function register({ name, email, password, phone }) {
+async function register({ name, email, password, phone, role }) {
   const db = getDb();
 
   // Check duplicate email
@@ -22,6 +22,10 @@ async function register({ name, email, password, phone }) {
     const err = new Error('Email already registered'); err.statusCode = 409; throw err;
   }
 
+  // Validate role
+  const validRoles = ['owner', 'driver', 'organization'];
+  const userRole = role && validRoles.includes(role) ? role : 'owner';
+
   const uid          = uuidv4();
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
   const now          = admin.firestore.FieldValue.serverTimestamp();
@@ -29,7 +33,7 @@ async function register({ name, email, password, phone }) {
   const userData = {
     uid, name, email: email.toLowerCase(),
     passwordHash, phone: phone || null,
-    role: 'owner', disabled: false,
+    role: userRole, disabled: false,
     createdAt: now, updatedAt: now,
   };
 

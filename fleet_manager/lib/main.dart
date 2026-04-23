@@ -4,6 +4,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'config/firebase_config.dart';
 import 'utils/theme.dart';
 import 'screens/home_screen.dart';
+import 'screens/dashboard_screen.dart';
+import 'screens/driver_dashboard_screen.dart';
+import 'screens/org_dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +50,12 @@ class _FleetManagerAppState extends State<FleetManagerApp> {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.build(colors),
         home: const HomeScreen(),
+        routes: {
+          '/home':             (_) => const HomeScreen(),
+          '/dashboard':        (_) => const DashboardScreen(),
+          '/driver-dashboard': (_) => const DriverDashboardScreen(),
+          '/org-dashboard':    (_) => const OrgDashboardScreen(),
+        },
       ),
     );
   }

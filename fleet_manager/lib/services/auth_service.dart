@@ -16,6 +16,7 @@ class AuthService {
     required String password,
     String company = '',
     String phone   = '',
+    String role    = 'owner',
   }) async {
     // Auth — 15 s hard timeout so it never hangs forever
     final cred = await _auth
@@ -34,18 +35,25 @@ class AuthService {
     // Best-effort display name update — don't let it block
     try { await cred.user!.updateDisplayName(name.trim()); } catch (_) {}
 
+    // Map role to display label
+    final roleLabel = role == 'driver'
+        ? 'Driver'
+        : role == 'organization'
+            ? 'Organization'
+            : 'Fleet Owner';
+
     final profile = UserProfile(
       uid:            cred.user!.uid,
       name:           name.trim(),
       email:          email.trim().toLowerCase(),
       phone:          phone,
       company:        company,
-      role:           'Fleet Owner',
+      role:           roleLabel,
       avatarInitials: AppStore.initials(name),
     );
 
     // Best-effort Firestore write — don't let it block or crash auth
-    _writeProfileToFirestore(profile);
+    _writeProfileToFirestore(profile, firestoreRole: role);
 
     AppStore.profile = profile;
     return profile;
@@ -72,10 +80,16 @@ class AuthService {
     // Build profile from Auth first (instant, no network needed)
     UserProfile profile = _profileFromAuthUser(cred.user!, email);
 
-    // Then try to enrich from Firestore in background — never block login
-    _loadProfileFromFirestore(cred.user!.uid, email).then((p) {
-      if (p != null) AppStore.profile = p;
-    }).catchError((_) {});
+    // Try to load role from Firestore — await so routing gets the correct role
+    try {
+      final firestoreProfile = await _loadProfileFromFirestore(cred.user!.uid, email)
+          .timeout(const Duration(seconds: 8));
+      if (firestoreProfile != null) {
+        profile = firestoreProfile;
+      }
+    } catch (_) {
+      // Fall back to default 'Fleet Owner' role if Firestore is unreachable
+    }
 
     AppStore.profile = profile;
     return profile;
@@ -88,13 +102,20 @@ class AuthService {
       final doc = await _db.collection('users').doc(uid).get();
       if (!doc.exists) return null;
       final d = doc.data()!;
+      final rawRole = d['role'] as String? ?? 'owner';
+      // Map stored role key to display label
+      final roleLabel = rawRole == 'driver'
+          ? 'Driver'
+          : rawRole == 'organization'
+              ? 'Organization'
+              : 'Fleet Owner';
       return UserProfile(
         uid:            d['uid']            as String? ?? uid,
         name:           d['name']           as String? ?? email.split('@').first,
         email:          d['email']          as String? ?? email,
         phone:          d['phone']          as String? ?? '',
         company:        d['company']        as String? ?? '',
-        role:           d['role']           as String? ?? 'Fleet Owner',
+        role:           roleLabel,
         avatarInitials: d['avatarInitials'] as String? ?? AppStore.initials(d['name'] as String? ?? email),
       );
     } catch (_) {
@@ -102,14 +123,14 @@ class AuthService {
     }
   }
 
-  static void _writeProfileToFirestore(UserProfile p) {
+  static void _writeProfileToFirestore(UserProfile p, {String firestoreRole = 'owner'}) {
     _db.collection('users').doc(p.uid).set({
       'uid':            p.uid,
       'name':           p.name,
       'email':          p.email,
       'phone':          p.phone,
       'company':        p.company,
-      'role':           p.role,
+      'role':           firestoreRole,
       'avatarInitials': p.avatarInitials,
       'createdAt':      FieldValue.serverTimestamp(),
     }).catchError((_) {}); // fire-and-forget

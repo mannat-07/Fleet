@@ -9,6 +9,8 @@ import '../widgets/theme_toggle.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import 'dashboard_screen.dart';
+import 'driver_dashboard_screen.dart';
+import 'org_dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -63,16 +65,26 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() { _loading = true; _error = null; });
 
     try {
-      await AuthService.signIn(email: email, password: password);
+      final profile = await AuthService.signIn(email: email, password: password);
 
       if (!mounted) return;
-      // Always reset loading before navigating
       setState(() => _loading = false);
+
+      // Role-based routing
+      Widget destination;
+      final role = profile.role.toLowerCase();
+      if (role == 'driver') {
+        destination = const DriverDashboardScreen();
+      } else if (role == 'organization') {
+        destination = const OrgDashboardScreen();
+      } else {
+        destination = const DashboardScreen();
+      }
 
       Navigator.pushAndRemoveUntil(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, a, __) => const DashboardScreen(),
+          pageBuilder: (_, a, __) => destination,
           transitionsBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 500),
