@@ -1,8 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../utils/theme.dart';
+import 'motion.dart';
 
-class GlassCard extends StatelessWidget {
+class GlassCard extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final double borderRadius;
@@ -23,37 +24,51 @@ class GlassCard extends StatelessWidget {
   });
 
   @override
+  State<GlassCard> createState() => _GlassCardState();
+}
+
+class _GlassCardState extends State<GlassCard> {
+  @override
   Widget build(BuildContext context) {
     final c = FleetTheme.of(context).colors;
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            width: width,
-            height: height,
-            decoration: BoxDecoration(
-              color: gradient == null ? c.cardBg : null,
-              gradient: gradient,
-              borderRadius: BorderRadius.circular(borderRadius),
-              border: Border.all(color: c.cardBorder, width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: c.isDark
-                      ? Colors.black.withOpacity(0.3)
-                      : Colors.black.withOpacity(0.06),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
+    final content = ClipRRect(
+      borderRadius: BorderRadius.circular(widget.borderRadius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: widget.gradient == null ? c.cardBg : null,
+            gradient: widget.gradient,
+            borderRadius: BorderRadius.circular(widget.borderRadius),
+            border: Border.all(color: c.cardBorder, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: c.isDark
+                    ? Colors.black.withOpacity(0.28)
+                    : Colors.black.withOpacity(0.06),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: AppColors.orangeStart.withOpacity(
+                  c.isDark ? 0.08 : 0.05,
                 ),
-              ],
-            ),
-            padding: padding ?? const EdgeInsets.all(20),
-            child: child,
+                blurRadius: 28,
+                spreadRadius: 0.6,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
+          padding: widget.padding ?? const EdgeInsets.all(20),
+          child: widget.child,
         ),
       ),
+    );
+
+    return FloatMotion(
+      child: PressScale(onTap: widget.onTap, child: content),
     );
   }
 }

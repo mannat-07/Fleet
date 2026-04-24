@@ -4,9 +4,9 @@ import '../models/models.dart';
 
 class AuthService {
   static final _auth = FirebaseAuth.instance;
-  static final _db   = FirebaseFirestore.instance;
+  static final _db = FirebaseFirestore.instance;
 
-  static User? get currentUser       => _auth.currentUser;
+  static User? get currentUser => _auth.currentUser;
   static Stream<User?> get authState => _auth.authStateChanges();
 
   // ── Sign up ─────────────────────────────────────────────────────────────────
@@ -15,40 +15,39 @@ class AuthService {
     required String email,
     required String password,
     String company = '',
-    String phone   = '',
-    String role    = 'owner',
+    String phone = '',
+    String role = 'owner',
   }) async {
     // Auth — 15 s hard timeout so it never hangs forever
     final cred = await _auth
-        .createUserWithEmailAndPassword(
-          email:    email.trim(),
-          password: password,
-        )
+        .createUserWithEmailAndPassword(email: email.trim(), password: password)
         .timeout(
           const Duration(seconds: 15),
           onTimeout: () => throw FirebaseAuthException(
-            code:    'network-request-failed',
+            code: 'network-request-failed',
             message: 'Request timed out. Check your connection.',
           ),
         );
 
     // Best-effort display name update — don't let it block
-    try { await cred.user!.updateDisplayName(name.trim()); } catch (_) {}
+    try {
+      await cred.user!.updateDisplayName(name.trim());
+    } catch (_) {}
 
     // Map role to display label
     final roleLabel = role == 'driver'
         ? 'Driver'
         : role == 'organization'
-            ? 'Organization'
-            : 'Fleet Owner';
+        ? 'Organization'
+        : 'Fleet Owner';
 
     final profile = UserProfile(
-      uid:            cred.user!.uid,
-      name:           name.trim(),
-      email:          email.trim().toLowerCase(),
-      phone:          phone,
-      company:        company,
-      role:           roleLabel,
+      uid: cred.user!.uid,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone,
+      company: company,
+      role: roleLabel,
       avatarInitials: AppStore.initials(name),
     );
 
@@ -65,14 +64,11 @@ class AuthService {
     required String password,
   }) async {
     final cred = await _auth
-        .signInWithEmailAndPassword(
-          email:    email.trim(),
-          password: password,
-        )
+        .signInWithEmailAndPassword(email: email.trim(), password: password)
         .timeout(
           const Duration(seconds: 15),
           onTimeout: () => throw FirebaseAuthException(
-            code:    'network-request-failed',
+            code: 'network-request-failed',
             message: 'Request timed out. Check your connection.',
           ),
         );
@@ -82,8 +78,10 @@ class AuthService {
 
     // Try to load role from Firestore — await so routing gets the correct role
     try {
-      final firestoreProfile = await _loadProfileFromFirestore(cred.user!.uid, email)
-          .timeout(const Duration(seconds: 8));
+      final firestoreProfile = await _loadProfileFromFirestore(
+        cred.user!.uid,
+        email,
+      ).timeout(const Duration(seconds: 8));
       if (firestoreProfile != null) {
         profile = firestoreProfile;
       }
@@ -97,7 +95,9 @@ class AuthService {
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   static Future<UserProfile?> _loadProfileFromFirestore(
-      String uid, String email) async {
+    String uid,
+    String email,
+  ) async {
     try {
       final doc = await _db.collection('users').doc(uid).get();
       if (!doc.exists) return null;
@@ -107,44 +107,53 @@ class AuthService {
       final roleLabel = rawRole == 'driver'
           ? 'Driver'
           : rawRole == 'organization'
-              ? 'Organization'
-              : 'Fleet Owner';
+          ? 'Organization'
+          : 'Fleet Owner';
       return UserProfile(
-        uid:            d['uid']            as String? ?? uid,
-        name:           d['name']           as String? ?? email.split('@').first,
-        email:          d['email']          as String? ?? email,
-        phone:          d['phone']          as String? ?? '',
-        company:        d['company']        as String? ?? '',
-        role:           roleLabel,
-        avatarInitials: d['avatarInitials'] as String? ?? AppStore.initials(d['name'] as String? ?? email),
+        uid: d['uid'] as String? ?? uid,
+        name: d['name'] as String? ?? email.split('@').first,
+        email: d['email'] as String? ?? email,
+        phone: d['phone'] as String? ?? '',
+        company: d['company'] as String? ?? '',
+        role: roleLabel,
+        avatarInitials:
+            d['avatarInitials'] as String? ??
+            AppStore.initials(d['name'] as String? ?? email),
       );
     } catch (_) {
       return null;
     }
   }
 
-  static void _writeProfileToFirestore(UserProfile p, {String firestoreRole = 'owner'}) {
-    _db.collection('users').doc(p.uid).set({
-      'uid':            p.uid,
-      'name':           p.name,
-      'email':          p.email,
-      'phone':          p.phone,
-      'company':        p.company,
-      'role':           firestoreRole,
-      'avatarInitials': p.avatarInitials,
-      'createdAt':      FieldValue.serverTimestamp(),
-    }).catchError((_) {}); // fire-and-forget
+  static void _writeProfileToFirestore(
+    UserProfile p, {
+    String firestoreRole = 'owner',
+  }) {
+    _db
+        .collection('users')
+        .doc(p.uid)
+        .set({
+          'uid': p.uid,
+          'name': p.name,
+          'email': p.email,
+          'phone': p.phone,
+          'company': p.company,
+          'role': firestoreRole,
+          'avatarInitials': p.avatarInitials,
+          'createdAt': FieldValue.serverTimestamp(),
+        })
+        .catchError((_) {}); // fire-and-forget
   }
 
   static UserProfile _profileFromAuthUser(User user, String email) {
     final displayName = user.displayName ?? email.split('@').first;
     return UserProfile(
-      uid:            user.uid,
-      name:           displayName,
-      email:          email.trim().toLowerCase(),
-      phone:          '',
-      company:        '',
-      role:           'Fleet Owner',
+      uid: user.uid,
+      name: displayName,
+      email: email.trim().toLowerCase(),
+      phone: '',
+      company: '',
+      role: 'Fleet Owner',
       avatarInitials: AppStore.initials(displayName),
     );
   }

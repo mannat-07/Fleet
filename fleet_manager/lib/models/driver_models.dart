@@ -17,15 +17,15 @@ class AssignedTruck {
   });
 
   factory AssignedTruck.fromJson(Map<String, dynamic> j) => AssignedTruck(
-        truckId:      j['truckId']      as String? ?? '',
-        plate:        j['plate']        as String? ?? '',
-        model:        j['model']        as String?,
-        type:         j['type']         as String?,
-        status:       j['status']       as String? ?? 'idle',
-        lastLocation: j['lastLocation'] != null
-            ? '${j['lastLocation']['lat']}, ${j['lastLocation']['lng']}'
-            : null,
-      );
+    truckId: j['truckId'] as String? ?? '',
+    plate: j['plate'] as String? ?? '',
+    model: j['model'] as String?,
+    type: j['type'] as String?,
+    status: j['status'] as String? ?? 'idle',
+    lastLocation: j['lastLocation'] != null
+        ? '${j['lastLocation']['lat']}, ${j['lastLocation']['lng']}'
+        : null,
+  );
 }
 
 // ─── Sensor Data (from IoT endpoint) ─────────────────────────────────────────
@@ -35,7 +35,7 @@ class SensorData {
   final String? loadStatus;
   final String? doorStatus;
   final double? temperature;
-  final bool?   engineOn;
+  final bool? engineOn;
   final DateTime? receivedAt;
 
   SensorData({
@@ -49,14 +49,14 @@ class SensorData {
   });
 
   factory SensorData.fromJson(Map<String, dynamic> j) => SensorData(
-        speed:       (j['speed']       as num?)?.toDouble(),
-        fuelLevel:   (j['fuelLevel']   as num?)?.toDouble(),
-        loadStatus:  j['loadStatus']   as String?,
-        doorStatus:  j['doorStatus']   as String?,
-        temperature: (j['temperature'] as num?)?.toDouble(),
-        engineOn:    j['engineOn']     as bool?,
-        receivedAt:  _parseTs(j['receivedAt']),
-      );
+    speed: (j['speed'] as num?)?.toDouble(),
+    fuelLevel: (j['fuelLevel'] as num?)?.toDouble(),
+    loadStatus: j['loadStatus'] as String?,
+    doorStatus: j['doorStatus'] as String?,
+    temperature: (j['temperature'] as num?)?.toDouble(),
+    engineOn: j['engineOn'] as bool?,
+    receivedAt: _parseTs(j['receivedAt']),
+  );
 
   static DateTime? _parseTs(dynamic ts) {
     if (ts == null) return null;
@@ -64,7 +64,8 @@ class SensorData {
     // Firestore Timestamp serialised as { _seconds, _nanoseconds }
     if (ts is Map && ts['_seconds'] != null) {
       return DateTime.fromMillisecondsSinceEpoch(
-          (ts['_seconds'] as int) * 1000);
+        (ts['_seconds'] as int) * 1000,
+      );
     }
     return null;
   }
@@ -79,34 +80,45 @@ class SensorData {
   List<SensorAlert> get alerts {
     final list = <SensorAlert>[];
     if (fuelLevel != null && fuelLevel! < 20) {
-      list.add(SensorAlert(
-        message: 'Low fuel — ${fuelLevel!.toStringAsFixed(0)}% remaining',
-        severity: AlertSeverity.critical,
-      ));
+      list.add(
+        SensorAlert(
+          message: 'Low fuel — ${fuelLevel!.toStringAsFixed(0)}% remaining',
+          severity: AlertSeverity.critical,
+        ),
+      );
     }
     if (loadStatus == 'loaded' && fuelLevel != null && fuelLevel! < 30) {
-      list.add(SensorAlert(
-        message: 'Loaded truck with low fuel',
-        severity: AlertSeverity.warning,
-      ));
+      list.add(
+        SensorAlert(
+          message: 'Loaded truck with low fuel',
+          severity: AlertSeverity.warning,
+        ),
+      );
     }
     if (doorStatus == 'open') {
-      list.add(SensorAlert(
-        message: 'Door is open while on trip',
-        severity: AlertSeverity.warning,
-      ));
+      list.add(
+        SensorAlert(
+          message: 'Door is open while on trip',
+          severity: AlertSeverity.warning,
+        ),
+      );
     }
     if (speed != null && speed! > 90) {
-      list.add(SensorAlert(
-        message: 'Overspeeding — ${speed!.toStringAsFixed(0)} km/h',
-        severity: AlertSeverity.critical,
-      ));
+      list.add(
+        SensorAlert(
+          message: 'Overspeeding — ${speed!.toStringAsFixed(0)} km/h',
+          severity: AlertSeverity.critical,
+        ),
+      );
     }
     if (temperature != null && temperature! > 80) {
-      list.add(SensorAlert(
-        message: 'High engine temperature — ${temperature!.toStringAsFixed(0)}°C',
-        severity: AlertSeverity.warning,
-      ));
+      list.add(
+        SensorAlert(
+          message:
+              'High engine temperature — ${temperature!.toStringAsFixed(0)}°C',
+          severity: AlertSeverity.warning,
+        ),
+      );
     }
     return list;
   }
@@ -139,13 +151,13 @@ class DriverProfile {
   });
 
   factory DriverProfile.fromJson(Map<String, dynamic> j) => DriverProfile(
-        driverId:       j['driverId']       as String? ?? '',
-        name:           j['name']           as String? ?? '',
-        phone:          j['phone']          as String?,
-        licenseNumber:  j['licenseNumber']  as String?,
-        assignedTruckId: j['assignedTruckId'] as String?,
-        status:         j['status']         as String? ?? 'available',
-      );
+    driverId: j['driverId'] as String? ?? '',
+    name: j['name'] as String? ?? '',
+    phone: j['phone'] as String?,
+    licenseNumber: j['licenseNumber'] as String?,
+    assignedTruckId: j['assignedTruckId'] as String?,
+    status: j['status'] as String? ?? 'available',
+  );
 
   bool get isOnTrip => status == 'on_trip';
 }

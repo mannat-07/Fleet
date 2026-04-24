@@ -12,26 +12,26 @@ class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() =>
-      _ForgotPasswordScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double>   _fadeAnim;
+  late Animation<double> _fadeAnim;
 
   final _emailCtrl = TextEditingController();
-  bool    _loading = false;
-  bool    _sent    = false;
+  bool _loading = false;
+  bool _sent = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 700))
-      ..forward();
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..forward();
     _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
   }
 
@@ -49,21 +49,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
       return;
     }
 
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
     try {
       await AuthService.sendPasswordReset(email);
       if (!mounted) return;
-      setState(() { _loading = false; _sent = true; });
+      setState(() {
+        _loading = false;
+        _sent = true;
+      });
     } on FirebaseAuthException catch (e) {
       setState(() {
         _loading = false;
-        _error   = AuthService.friendlyError(e);
+        _error = AuthService.friendlyError(e);
       });
     } catch (e) {
       setState(() {
         _loading = false;
-        _error   = 'Something went wrong. Please try again.';
+        _error = 'Something went wrong. Please try again.';
       });
     }
   }
@@ -83,33 +89,46 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 32),
-                  Row(children: [
-                    const FleetBackButton(),
-                    const Spacer(),
-                    const ThemeToggle(),
-                  ]),
+                  Row(
+                    children: [
+                      const FleetBackButton(),
+                      const Spacer(),
+                      const ThemeToggle(),
+                    ],
+                  ),
                   const SizedBox(height: 40),
 
                   Container(
-                    width: 60, height: 60,
+                    width: 60,
+                    height: 60,
                     decoration: BoxDecoration(
-                        gradient: AppColors.orangeGradient,
-                        borderRadius: BorderRadius.circular(16)),
-                    child: const Icon(Icons.lock_reset,
-                        color: Color(0xFFFFFFFF), size: 28),
+                      gradient: AppColors.orangeGradient,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.lock_reset,
+                      color: Color(0xFFFFFFFF),
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(height: 24),
 
-                  Text('Reset Password',
-                      style: TextStyle(
-                          color: c.text,
-                          fontSize: 36,
-                          fontWeight: FontWeight.w900)),
+                  Text(
+                    'Reset Password',
+                    style: TextStyle(
+                      color: c.text,
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     "Enter your email and we'll send you\na reset link.",
                     style: TextStyle(
-                        color: c.textSub, fontSize: 15, height: 1.5),
+                      color: c.textSub,
+                      fontSize: 15,
+                      height: 1.5,
+                    ),
                   ),
                   const SizedBox(height: 32),
 
@@ -121,18 +140,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                           color: AppColors.red.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: AppColors.red.withOpacity(0.35)),
+                            color: AppColors.red.withOpacity(0.35),
+                          ),
                         ),
-                        child: Row(children: [
-                          const Icon(Icons.error_outline,
-                              color: AppColors.red, size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              child: Text(_error!,
-                                  style: const TextStyle(
-                                      color: AppColors.red,
-                                      fontSize: 13))),
-                        ]),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.error_outline,
+                              color: AppColors.red,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _error!,
+                                style: const TextStyle(
+                                  color: AppColors.red,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -161,28 +190,36 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                       child: Column(
                         children: [
                           Container(
-                            width: 64, height: 64,
+                            width: 64,
+                            height: 64,
                             decoration: BoxDecoration(
                               color: AppColors.green.withOpacity(0.15),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.check_circle_outline,
-                                color: AppColors.green, size: 32),
+                            child: const Icon(
+                              Icons.check_circle_outline,
+                              color: AppColors.green,
+                              size: 32,
+                            ),
                           ),
                           const SizedBox(height: 16),
-                          Text('Email Sent!',
-                              style: TextStyle(
-                                  color: c.text,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700)),
+                          Text(
+                            'Email Sent!',
+                            style: TextStyle(
+                              color: c.text,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           Text(
                             'Check your inbox for the password reset link.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                                color: c.textSub,
-                                fontSize: 14,
-                                height: 1.5),
+                              color: c.textSub,
+                              fontSize: 14,
+                              height: 1.5,
+                            ),
                           ),
                           const SizedBox(height: 24),
                           CustomButton(

@@ -4,12 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 // ─── Shared accent colors (same in both themes) ─────────────────────────────
 class AppColors {
   static const Color orangeStart = Color(0xFFFF5A1F);
-  static const Color orangeEnd   = Color(0xFFFF2D00);
-  static const Color green       = Color(0xFF4CAF50);
-  static const Color amber       = Color(0xFFFFC107);
-  static const Color red         = Color(0xFFFF5252);
-  static const Color blue        = Color(0xFF4FC3F7);
-  static const Color purple      = Color(0xFFAB47BC);
+  static const Color orangeEnd = Color(0xFFFF2D00);
+  static const Color green = Color(0xFF4CAF50);
+  static const Color amber = Color(0xFFFFC107);
+  static const Color red = Color(0xFFFF5252);
+  static const Color blue = Color(0xFF4FC3F7);
+  static const Color purple = Color(0xFFAB47BC);
 
   static const LinearGradient orangeGradient = LinearGradient(
     colors: [orangeStart, orangeEnd],
@@ -61,45 +61,45 @@ class FleetColors {
   });
 
   static const FleetColors dark = FleetColors(
-    background:    Color(0xFF0B0B0B),
+    background: Color(0xFF0B0B0B),
     backgroundEnd: Color(0xFF121212),
-    surface:       Color(0xFF1A1A1A),
-    surfaceHigh:   Color(0xFF242424),
-    cardBorder:    Color(0x1AFFFFFF),
-    cardBg:        Color(0x12FFFFFF),
-    text:          Color(0xFFFFFFFF),
-    textSub:       Color(0xFF9E9E9E),
-    iconBg:        Color(0xFF2A2A2A),
-    inputBg:       Color(0x0DFFFFFF),
-    inputBorder:   Color(0x1AFFFFFF),
-    divider:       Color(0x14FFFFFF),
-    tooltipBg:     Color(0xFF2A2A2A),
-    chartGrid:     Color(0x0DFFFFFF),
-    backBtnBg:     Color(0x12FFFFFF),
+    surface: Color(0xFF1A1A1A),
+    surfaceHigh: Color(0xFF242424),
+    cardBorder: Color(0x1AFFFFFF),
+    cardBg: Color(0x12FFFFFF),
+    text: Color(0xFFFFFFFF),
+    textSub: Color(0xFF9E9E9E),
+    iconBg: Color(0xFF2A2A2A),
+    inputBg: Color(0x0DFFFFFF),
+    inputBorder: Color(0x1AFFFFFF),
+    divider: Color(0x14FFFFFF),
+    tooltipBg: Color(0xFF2A2A2A),
+    chartGrid: Color(0x0DFFFFFF),
+    backBtnBg: Color(0x12FFFFFF),
     backBtnBorder: Color(0x1AFFFFFF),
-    sheetBg:       Color(0xFF1A1A1A),
-    isDark:        true,
+    sheetBg: Color(0xFF1A1A1A),
+    isDark: true,
   );
 
   static const FleetColors light = FleetColors(
-    background:    Color(0xFFF4F6FA),
+    background: Color(0xFFF4F6FA),
     backgroundEnd: Color(0xFFEAEDF5),
-    surface:       Color(0xFFFFFFFF),
-    surfaceHigh:   Color(0xFFF0F2F8),
-    cardBorder:    Color(0x1A000000),
-    cardBg:        Color(0xFFFFFFFF),
-    text:          Color(0xFF0F1117),
-    textSub:       Color(0xFF6B7280),
-    iconBg:        Color(0xFFF0F2F8),
-    inputBg:       Color(0xFFF7F8FC),
-    inputBorder:   Color(0xFFE2E6F0),
-    divider:       Color(0xFFE5E7EB),
-    tooltipBg:     Color(0xFFFFFFFF),
-    chartGrid:     Color(0x14000000),
-    backBtnBg:     Color(0xFFFFFFFF),
+    surface: Color(0xFFFFFFFF),
+    surfaceHigh: Color(0xFFF0F2F8),
+    cardBorder: Color(0x1A000000),
+    cardBg: Color(0xFFFFFFFF),
+    text: Color(0xFF0F1117),
+    textSub: Color(0xFF6B7280),
+    iconBg: Color(0xFFF0F2F8),
+    inputBg: Color(0xFFF7F8FC),
+    inputBorder: Color(0xFFE2E6F0),
+    divider: Color(0xFFE5E7EB),
+    tooltipBg: Color(0xFFFFFFFF),
+    chartGrid: Color(0x14000000),
+    backBtnBg: Color(0xFFFFFFFF),
     backBtnBorder: Color(0xFFE2E6F0),
-    sheetBg:       Color(0xFFFFFFFF),
-    isDark:        false,
+    sheetBg: Color(0xFFFFFFFF),
+    isDark: false,
   );
 
   LinearGradient get backgroundGradient => LinearGradient(

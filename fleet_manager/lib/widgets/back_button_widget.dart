@@ -11,14 +11,21 @@ class FleetBackButton extends StatelessWidget {
     return GestureDetector(
       onTap: () => Navigator.maybePop(context),
       child: Container(
-        width: 40, height: 40,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
           color: c.backBtnBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: c.backBtnBorder),
           boxShadow: c.isDark
               ? []
-              : [BoxShadow(color: const Color(0x0F000000), blurRadius: 8, offset: const Offset(0, 2))],
+              : [
+                  BoxShadow(
+                    color: const Color(0x0F000000),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Icon(Icons.arrow_back_ios_new, color: c.text, size: 16),
       ),
@@ -55,16 +62,23 @@ class ScreenHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,    style: TextStyle(color: c.text,    fontSize: 22, fontWeight: FontWeight.w800)),
-                Text(subtitle, style: TextStyle(color: c.textSub, fontSize: 13)),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: c.text,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(color: c.textSub, fontSize: 13),
+                ),
               ],
             ),
           ),
           ...actions,
-          if (showToggle) ...[
-            const SizedBox(width: 10),
-            const ThemeToggle(),
-          ],
+          if (showToggle) ...[const SizedBox(width: 10), const ThemeToggle()],
         ],
       ),
     );
@@ -77,18 +91,30 @@ class HeaderIconBtn extends StatelessWidget {
   final VoidCallback onTap;
   final Color? color;
 
-  const HeaderIconBtn({super.key, required this.icon, required this.onTap, this.color});
+  const HeaderIconBtn({
+    super.key,
+    required this.icon,
+    required this.onTap,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 40, height: 40,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
           gradient: AppColors.orangeGradient,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: AppColors.orangeStart.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.orangeStart.withOpacity(0.35),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Icon(icon, color: const Color(0xFFFFFFFF), size: 20),
       ),

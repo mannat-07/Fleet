@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../utils/theme.dart';
 import '../widgets/theme_toggle.dart';
+import '../widgets/motion.dart';
 import 'driver_profile_screen.dart';
 import 'home_screen.dart';
 
@@ -25,8 +26,8 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
   // Data state
   DriverProfile? _driver;
   AssignedTruck? _truck;
-  SensorData?    _sensor;
-  bool  _loading = true;
+  SensorData? _sensor;
+  bool _loading = true;
   String? _error;
   Timer? _pollTimer;
 
@@ -34,16 +35,23 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
   void initState() {
     super.initState();
     _staggerCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1100));
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    );
     for (int i = 0; i < 4; i++) {
-      _anims.add(CurvedAnimation(
-        parent: _staggerCtrl,
-        curve: Interval(i * 0.15, 0.6 + i * 0.1, curve: Curves.easeOutCubic),
-      ));
+      _anims.add(
+        CurvedAnimation(
+          parent: _staggerCtrl,
+          curve: Interval(i * 0.15, 0.6 + i * 0.1, curve: Curves.easeOutCubic),
+        ),
+      );
     }
     _loadAll();
     // Poll sensor data every 15 s
-    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) => _refreshSensor());
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _refreshSensor(),
+    );
   }
 
   @override
@@ -55,35 +63,39 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
   }
 
   Future<void> _loadAll() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final result = await ApiService.getDriverMe();
 
       DriverProfile? driver;
       AssignedTruck? truck;
-      SensorData?    sensor;
+      SensorData? sensor;
 
       if (result != null) {
         final driverJson = result['driver'] as Map<String, dynamic>?;
-        final truckJson  = result['truck']  as Map<String, dynamic>?;
+        final truckJson = result['truck'] as Map<String, dynamic>?;
         final sensorJson = result['sensor'] as Map<String, dynamic>?;
         driver = driverJson != null ? DriverProfile.fromJson(driverJson) : null;
-        truck  = truckJson  != null ? AssignedTruck.fromJson(truckJson)  : null;
+        truck = truckJson != null ? AssignedTruck.fromJson(truckJson) : null;
         sensor = (sensorJson != null && sensorJson.isNotEmpty)
-            ? SensorData.fromJson(sensorJson) : null;
+            ? SensorData.fromJson(sensorJson)
+            : null;
       }
 
       // ── Demo fallback — shown when no real data is linked yet ──────────────
       if (driver == null) driver = _demoDriver();
-      if (truck  == null) truck  = _demoTruck();
+      if (truck == null) truck = _demoTruck();
       if (sensor == null) sensor = _demoSensor();
       // ───────────────────────────────────────────────────────────────────────
 
       if (!mounted) return;
       setState(() {
-        _driver  = driver;
-        _truck   = truck;
-        _sensor  = sensor;
+        _driver = driver;
+        _truck = truck;
+        _sensor = sensor;
         _loading = false;
       });
       _staggerCtrl.reset();
@@ -92,11 +104,11 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
       // On error still show demo data so the UI isn't blank
       if (!mounted) return;
       setState(() {
-        _driver  = _demoDriver();
-        _truck   = _demoTruck();
-        _sensor  = _demoSensor();
+        _driver = _demoDriver();
+        _truck = _demoTruck();
+        _sensor = _demoSensor();
         _loading = false;
-        _error   = null; // suppress error — demo data covers it
+        _error = null; // suppress error — demo data covers it
       });
       _staggerCtrl.reset();
       _staggerCtrl.forward();
@@ -105,32 +117,34 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
 
   // ── Demo data ───────────────────────────────────────────────────────────────
   static DriverProfile _demoDriver() => DriverProfile(
-        driverId:        'demo',
-        name:            AppStore.profile.name.isNotEmpty ? AppStore.profile.name : 'Rajesh Kumar',
-        phone:           '+91 98765 43210',
-        licenseNumber:   'MH-0120110012345',
-        assignedTruckId: 'demo-truck',
-        status:          'on_trip',
-      );
+    driverId: 'demo',
+    name: AppStore.profile.name.isNotEmpty
+        ? AppStore.profile.name
+        : 'Rajesh Kumar',
+    phone: '+91 98765 43210',
+    licenseNumber: 'MH-0120110012345',
+    assignedTruckId: 'demo-truck',
+    status: 'on_trip',
+  );
 
   static AssignedTruck _demoTruck() => AssignedTruck(
-        truckId:      'demo-truck',
-        plate:        'MH12 AB 1234',
-        model:        'Tata Prima 4928.S',
-        type:         'Heavy',
-        status:       'on_trip',
-        lastLocation: 'Mumbai → Pune',
-      );
+    truckId: 'demo-truck',
+    plate: 'MH12 AB 1234',
+    model: 'Tata Prima 4928.S',
+    type: 'Heavy',
+    status: 'on_trip',
+    lastLocation: 'Mumbai → Pune',
+  );
 
   static SensorData _demoSensor() => SensorData(
-        speed:       65,
-        fuelLevel:   72,
-        loadStatus:  'loaded',
-        doorStatus:  'closed',
-        temperature: 42,
-        engineOn:    true,
-        receivedAt:  DateTime.now().subtract(const Duration(minutes: 2)),
-      );
+    speed: 65,
+    fuelLevel: 72,
+    loadStatus: 'loaded',
+    doorStatus: 'closed',
+    temperature: 42,
+    engineOn: true,
+    receivedAt: DateTime.now().subtract(const Duration(minutes: 2)),
+  );
 
   Future<void> _refreshSensor() async {
     if (_truck == null) return;
@@ -153,8 +167,8 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
           child: _loading
               ? _buildLoader(c)
               : _error != null
-                  ? _buildError(c)
-                  : _buildContent(c),
+              ? _buildError(c)
+              : _buildContent(c),
         ),
       ),
     );
@@ -163,56 +177,65 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
   // ── States ──────────────────────────────────────────────────────────────────
 
   Widget _buildLoader(FleetColors c) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(color: AppColors.orangeStart),
-            const SizedBox(height: 16),
-            Text('Loading your dashboard…',
-                style: TextStyle(color: c.textSub, fontSize: 14)),
-          ],
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const CircularProgressIndicator(color: AppColors.orangeStart),
+        const SizedBox(height: 16),
+        Text(
+          'Loading your dashboard…',
+          style: TextStyle(color: c.textSub, fontSize: 14),
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _buildError(FleetColors c) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.cloud_off_outlined, color: c.textSub, size: 48),
-              const SizedBox(height: 16),
-              Text('Could not load data',
-                  style: TextStyle(
-                      color: c.text, fontSize: 18, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              Text(_error ?? 'Unknown error',
-                  style: TextStyle(color: c.textSub, fontSize: 13),
-                  textAlign: TextAlign.center),
-              const SizedBox(height: 24),
-              _OrangeButton(label: 'Retry', onTap: _loadAll),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.cloud_off_outlined, color: c.textSub, size: 48),
+          const SizedBox(height: 16),
+          Text(
+            'Could not load data',
+            style: TextStyle(
+              color: c.text,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-      );
+          const SizedBox(height: 8),
+          Text(
+            _error ?? 'Unknown error',
+            style: TextStyle(color: c.textSub, fontSize: 13),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          _OrangeButton(label: 'Retry', onTap: _loadAll),
+        ],
+      ),
+    ),
+  );
 
   Widget _buildContent(FleetColors c) => RefreshIndicator(
-        color: AppColors.orangeStart,
-        backgroundColor: c.surface,
-        onRefresh: _loadAll,
-        child: CustomScrollView(
-          controller: _scrollCtrl,
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(child: _buildHeader(context, c)),
-            SliverToBoxAdapter(child: _buildTruckCard(c)),
-            SliverToBoxAdapter(child: _buildTripCard(c)),
-            SliverToBoxAdapter(child: _buildSensorCard(c)),
-            SliverToBoxAdapter(child: _buildAlertsCard(c)),
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
-          ],
-        ),
-      );
+    color: AppColors.orangeStart,
+    backgroundColor: c.surface,
+    onRefresh: _loadAll,
+    child: CustomScrollView(
+      controller: _scrollCtrl,
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(child: _buildHeader(context, c)),
+        SliverToBoxAdapter(child: _buildTruckCard(c)),
+        SliverToBoxAdapter(child: _buildTripCard(c)),
+        SliverToBoxAdapter(child: _buildSensorCard(c)),
+        SliverToBoxAdapter(child: _buildAlertsCard(c)),
+        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+      ],
+    ),
+  );
 
   // ── Header ──────────────────────────────────────────────────────────────────
 
@@ -220,8 +243,8 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
     final name = _driver?.name.isNotEmpty == true
         ? _driver!.name
         : AppStore.profile.name.isNotEmpty
-            ? AppStore.profile.name
-            : 'Driver';
+        ? AppStore.profile.name
+        : 'Driver';
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       child: Row(
@@ -237,13 +260,18 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('My Trip',
-                    style: TextStyle(
-                        color: c.text,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900)),
-                Text('Hi, $name',
-                    style: TextStyle(color: c.textSub, fontSize: 13)),
+                Text(
+                  'My Trip',
+                  style: TextStyle(
+                    color: c.text,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  'Hi, $name',
+                  style: TextStyle(color: c.textSub, fontSize: 13),
+                ),
               ],
             ),
           ),
@@ -272,11 +300,26 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
               )
             : Column(
                 children: [
-                  _InfoRow(label: 'Plate',  value: _truck!.plate,          icon: Icons.badge_outlined,          c: c),
+                  _InfoRow(
+                    label: 'Plate',
+                    value: _truck!.plate,
+                    icon: Icons.badge_outlined,
+                    c: c,
+                  ),
                   const SizedBox(height: 10),
-                  _InfoRow(label: 'Model',  value: _truck!.model ?? '—',   icon: Icons.directions_car_outlined, c: c),
+                  _InfoRow(
+                    label: 'Model',
+                    value: _truck!.model ?? '—',
+                    icon: Icons.directions_car_outlined,
+                    c: c,
+                  ),
                   const SizedBox(height: 10),
-                  _InfoRow(label: 'Type',   value: _truck!.type  ?? '—',   icon: Icons.category_outlined,       c: c),
+                  _InfoRow(
+                    label: 'Type',
+                    value: _truck!.type ?? '—',
+                    icon: Icons.category_outlined,
+                    c: c,
+                  ),
                   const SizedBox(height: 10),
                   _InfoRow(
                     label: 'Status',
@@ -359,89 +402,90 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
                 c: c,
               )
             : _sensor == null || !_sensor!.hasData
-                ? _EmptyState(
-                    icon: Icons.wifi_off,
-                    message: 'Waiting for data',
-                    sub: 'No sensor readings yet',
-                    c: c,
-                  )
-                : Column(
+            ? _EmptyState(
+                icon: Icons.wifi_off,
+                message: 'Waiting for data',
+                sub: 'No sensor readings yet',
+                c: c,
+              )
+            : Column(
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _SensorTile(
-                              label: 'Speed',
-                              value: _sensor!.speed != null
-                                  ? '${_sensor!.speed!.toStringAsFixed(0)}'
-                                  : '—',
-                              unit: 'km/h',
-                              icon: Icons.speed,
-                              color: AppColors.blue,
-                              c: c,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _SensorTile(
-                              label: 'Fuel',
-                              value: _sensor!.fuelLevel != null
-                                  ? '${_sensor!.fuelLevel!.toStringAsFixed(0)}'
-                                  : '—',
-                              unit: '%',
-                              icon: Icons.local_gas_station,
-                              color: _fuelColor(_sensor!.fuelLevel),
-                              c: c,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _SensorTile(
-                              label: 'Load',
-                              value: _sensor!.loadStatus ?? '—',
-                              unit: '',
-                              icon: Icons.inventory_2_outlined,
-                              color: AppColors.amber,
-                              c: c,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _SensorTile(
-                              label: 'Door',
-                              value: _sensor!.doorStatus ?? '—',
-                              unit: '',
-                              icon: Icons.door_back_door_outlined,
-                              color: _doorColor(_sensor!.doorStatus),
-                              c: c,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_sensor!.temperature != null) ...[
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _SensorTile(
-                                label: 'Temp',
-                                value: '${_sensor!.temperature!.toStringAsFixed(0)}',
-                                unit: '°C',
-                                icon: Icons.thermostat,
-                                color: _tempColor(_sensor!.temperature),
-                                c: c,
-                              ),
-                            ),
-                            Expanded(child: Container()),
-                          ],
+                      Expanded(
+                        child: _SensorTile(
+                          label: 'Speed',
+                          value: _sensor!.speed != null
+                              ? '${_sensor!.speed!.toStringAsFixed(0)}'
+                              : '—',
+                          unit: 'km/h',
+                          icon: Icons.speed,
+                          color: AppColors.blue,
+                          c: c,
                         ),
-                      ],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _SensorTile(
+                          label: 'Fuel',
+                          value: _sensor!.fuelLevel != null
+                              ? '${_sensor!.fuelLevel!.toStringAsFixed(0)}'
+                              : '—',
+                          unit: '%',
+                          icon: Icons.local_gas_station,
+                          color: _fuelColor(_sensor!.fuelLevel),
+                          c: c,
+                        ),
+                      ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _SensorTile(
+                          label: 'Load',
+                          value: _sensor!.loadStatus ?? '—',
+                          unit: '',
+                          icon: Icons.inventory_2_outlined,
+                          color: AppColors.amber,
+                          c: c,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _SensorTile(
+                          label: 'Door',
+                          value: _sensor!.doorStatus ?? '—',
+                          unit: '',
+                          icon: Icons.door_back_door_outlined,
+                          color: _doorColor(_sensor!.doorStatus),
+                          c: c,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_sensor!.temperature != null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SensorTile(
+                            label: 'Temp',
+                            value:
+                                '${_sensor!.temperature!.toStringAsFixed(0)}',
+                            unit: '°C',
+                            icon: Icons.thermostat,
+                            color: _tempColor(_sensor!.temperature),
+                            c: c,
+                          ),
+                        ),
+                        Expanded(child: Container()),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
       ),
     );
   }
@@ -470,10 +514,12 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
               )
             : Column(
                 children: alerts
-                    .map((a) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _AlertRow(alert: a, c: c),
-                        ))
+                    .map(
+                      (a) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _AlertRow(alert: a, c: c),
+                      ),
+                    )
                     .toList(),
               ),
       ),
@@ -493,78 +539,93 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
             Divider(color: c.divider, height: 1),
             // These scroll to sections within the same dashboard page
             _DrawerItem(
-                icon: Icons.local_shipping_outlined,
-                label: 'My Truck',
-                onTap: () {
-                  Navigator.pop(context);
-                  _scrollCtrl.animateTo(0,
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeOut);
-                },
-                c: c),
+              icon: Icons.local_shipping_outlined,
+              label: 'My Truck',
+              onTap: () {
+                Navigator.pop(context);
+                _scrollCtrl.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut,
+                );
+              },
+              c: c,
+            ),
             _DrawerItem(
-                icon: Icons.route,
-                label: 'Trip Status',
-                onTap: () {
-                  Navigator.pop(context);
-                  _scrollCtrl.animateTo(220,
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeOut);
-                },
-                c: c),
+              icon: Icons.route,
+              label: 'Trip Status',
+              onTap: () {
+                Navigator.pop(context);
+                _scrollCtrl.animateTo(
+                  220,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut,
+                );
+              },
+              c: c,
+            ),
             _DrawerItem(
-                icon: Icons.sensors,
-                label: 'Live Sensors',
-                onTap: () {
-                  Navigator.pop(context);
-                  _scrollCtrl.animateTo(440,
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeOut);
-                },
-                c: c),
+              icon: Icons.sensors,
+              label: 'Live Sensors',
+              onTap: () {
+                Navigator.pop(context);
+                _scrollCtrl.animateTo(
+                  440,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut,
+                );
+              },
+              c: c,
+            ),
             _DrawerItem(
-                icon: Icons.warning_amber_rounded,
-                label: 'Alerts',
-                onTap: () {
-                  Navigator.pop(context);
-                  _scrollCtrl.animateTo(
-                      _scrollCtrl.position.maxScrollExtent,
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeOut);
-                },
-                c: c),
+              icon: Icons.warning_amber_rounded,
+              label: 'Alerts',
+              onTap: () {
+                Navigator.pop(context);
+                _scrollCtrl.animateTo(
+                  _scrollCtrl.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut,
+                );
+              },
+              c: c,
+            ),
             _DrawerItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => DriverProfileScreen(
-                                driverProfile: _driver,
-                                assignedTruck: _truck,
-                              )));
-                },
-                c: c),
+              icon: Icons.person_outline,
+              label: 'Profile',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  AppMotionRoute.fadeSlideScale(
+                    DriverProfileScreen(
+                      driverProfile: _driver,
+                      assignedTruck: _truck,
+                    ),
+                  ),
+                );
+              },
+              c: c,
+            ),
             const Spacer(),
             Divider(color: c.divider, height: 1),
             _DrawerItem(
-                icon: Icons.logout,
-                label: 'Logout',
-                onTap: () async {
-                  Navigator.pop(context);
-                  await AuthService.signOut();
-                  if (!mounted) return;
-                  // ignore: use_build_context_synchronously
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (_) => const HomeScreen()),
-                    (_) => false,
-                  );
-                },
-                c: c,
-                isDestructive: true),
+              icon: Icons.logout,
+              label: 'Logout',
+              onTap: () async {
+                Navigator.pop(context);
+                await AuthService.signOut();
+                if (!mounted) return;
+                // ignore: use_build_context_synchronously
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  AppMotionRoute.fadeSlideScale(const HomeScreen()),
+                  (_) => false,
+                );
+              },
+              c: c,
+              isDestructive: true,
+            ),
             const SizedBox(height: 16),
           ],
         ),
@@ -576,11 +637,16 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen>
 
   Color _statusColor(String status) {
     switch (status) {
-      case 'on_trip':     return AppColors.green;
-      case 'active':      return AppColors.blue;
-      case 'idle':        return AppColors.amber;
-      case 'maintenance': return AppColors.red;
-      default:            return AppColors.amber;
+      case 'on_trip':
+        return AppColors.green;
+      case 'active':
+        return AppColors.blue;
+      case 'idle':
+        return AppColors.amber;
+      case 'maintenance':
+        return AppColors.red;
+      default:
+        return AppColors.amber;
     }
   }
 
@@ -620,13 +686,15 @@ class _Animated extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: anim,
-        builder: (_, __) => Opacity(
-          opacity: anim.value,
-          child: Transform.translate(
-              offset: Offset(0, 28 * (1 - anim.value)), child: child),
-        ),
-      );
+    animation: anim,
+    builder: (_, __) => Opacity(
+      opacity: anim.value,
+      child: Transform.translate(
+        offset: Offset(0, 28 * (1 - anim.value)),
+        child: child,
+      ),
+    ),
+  );
 }
 
 class _DashCard extends StatelessWidget {
@@ -668,20 +736,31 @@ class _DashCard extends StatelessWidget {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     gradient: iconGradient ? AppColors.orangeGradient : null,
-                    color: iconGradient ? null : (iconColor ?? AppColors.orangeStart).withOpacity(0.15),
+                    color: iconGradient
+                        ? null
+                        : (iconColor ?? AppColors.orangeStart).withOpacity(
+                            0.15,
+                          ),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon,
-                      color: iconGradient ? Colors.white : (iconColor ?? AppColors.orangeStart),
-                      size: 20),
+                  child: Icon(
+                    icon,
+                    color: iconGradient
+                        ? Colors.white
+                        : (iconColor ?? AppColors.orangeStart),
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(title,
-                      style: TextStyle(
-                          color: c.text,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700)),
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: c.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
                 if (trailing != null) trailing!,
               ],
@@ -711,18 +790,21 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        children: [
-          Icon(icon, color: c.textSub, size: 16),
-          const SizedBox(width: 8),
-          Text(label, style: TextStyle(color: c.textSub, fontSize: 13)),
-          const Spacer(),
-          Text(value,
-              style: TextStyle(
-                  color: valueColor ?? c.text,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600)),
-        ],
-      );
+    children: [
+      Icon(icon, color: c.textSub, size: 16),
+      const SizedBox(width: 8),
+      Text(label, style: TextStyle(color: c.textSub, fontSize: 13)),
+      const Spacer(),
+      Text(
+        value,
+        style: TextStyle(
+          color: valueColor ?? c.text,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ],
+  );
 }
 
 class _SensorTile extends StatelessWidget {
@@ -743,43 +825,48 @@ class _SensorTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: c.surfaceHigh,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: c.cardBorder),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: c.surfaceHigh,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: c.cardBorder),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(height: 8),
+        Text(label, style: TextStyle(color: c.textSub, fontSize: 11)),
+        const SizedBox(height: 4),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(height: 8),
-            Text(label, style: TextStyle(color: c.textSub, fontSize: 11)),
-            const SizedBox(height: 4),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Flexible(
-                  child: Text(value,
-                      style: TextStyle(
-                          color: c.text,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800),
-                      overflow: TextOverflow.ellipsis),
+            Flexible(
+              child: Text(
+                value,
+                style: TextStyle(
+                  color: c.text,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
                 ),
-                if (unit.isNotEmpty) ...[
-                  const SizedBox(width: 3),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 1),
-                    child: Text(unit,
-                        style: TextStyle(color: c.textSub, fontSize: 11)),
-                  ),
-                ],
-              ],
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
+            if (unit.isNotEmpty) ...[
+              const SizedBox(width: 3),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 1),
+                child: Text(
+                  unit,
+                  style: TextStyle(color: c.textSub, fontSize: 11),
+                ),
+              ),
+            ],
           ],
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _AlertRow extends StatelessWidget {
@@ -810,9 +897,14 @@ class _AlertRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(alert.message,
-                style: TextStyle(
-                    color: c.text, fontSize: 13, fontWeight: FontWeight.w500)),
+            child: Text(
+              alert.message,
+              style: TextStyle(
+                color: c.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
         ],
       ),
@@ -836,29 +928,31 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Icon(icon, color: iconColor ?? c.textSub, size: 32),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(message,
-                      style: TextStyle(
-                          color: c.text,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 2),
-                  Text(sub,
-                      style: TextStyle(color: c.textSub, fontSize: 12)),
-                ],
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(
+      children: [
+        Icon(icon, color: iconColor ?? c.textSub, size: 32),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message,
+                style: TextStyle(
+                  color: c.text,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(sub, style: TextStyle(color: c.textSub, fontSize: 12)),
+            ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _StatusBadge extends StatelessWidget {
@@ -868,16 +962,17 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Text(label,
-            style: TextStyle(
-                color: color, fontSize: 11, fontWeight: FontWeight.w700)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.15),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color.withOpacity(0.3)),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+    ),
+  );
 }
 
 class _IconBox extends StatelessWidget {
@@ -887,15 +982,15 @@ class _IconBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: c.iconBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: c.cardBorder),
-        ),
-        child: Icon(icon, color: c.text, size: 22),
-      );
+    width: 44,
+    height: 44,
+    decoration: BoxDecoration(
+      color: c.iconBg,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: c.cardBorder),
+    ),
+    child: Icon(icon, color: c.text, size: 22),
+  );
 }
 
 class _OrangeButton extends StatelessWidget {
@@ -905,62 +1000,73 @@ class _OrangeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-          decoration: BoxDecoration(
-            gradient: AppColors.orangeGradient,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Text(label,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15)),
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: AppColors.orangeGradient,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          fontSize: 15,
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _DrawerHeader extends StatelessWidget {
   final UserProfile profile;
   final String role;
   final FleetColors c;
-  const _DrawerHeader(
-      {required this.profile, required this.role, required this.c});
+  const _DrawerHeader({
+    required this.profile,
+    required this.role,
+    required this.c,
+  });
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: AppColors.orangeStart.withOpacity(0.2),
-              child: Text(profile.avatarInitials,
-                  style: const TextStyle(
-                      color: AppColors.orangeStart,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800)),
+    padding: const EdgeInsets.all(24),
+    child: Row(
+      children: [
+        CircleAvatar(
+          radius: 28,
+          backgroundColor: AppColors.orangeStart.withOpacity(0.2),
+          child: Text(
+            profile.avatarInitials,
+            style: const TextStyle(
+              color: AppColors.orangeStart,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(profile.name,
-                      style: TextStyle(
-                          color: c.text,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700),
-                      overflow: TextOverflow.ellipsis),
-                  Text(role,
-                      style: TextStyle(color: c.textSub, fontSize: 12)),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
-      );
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                profile.name,
+                style: TextStyle(
+                  color: c.text,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(role, style: TextStyle(color: c.textSub, fontSize: 12)),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _DrawerItem extends StatelessWidget {
@@ -982,8 +1088,10 @@ class _DrawerItem extends StatelessWidget {
     final color = isDestructive ? AppColors.red : c.text;
     return ListTile(
       leading: Icon(icon, color: color, size: 22),
-      title: Text(label,
-          style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+      title: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+      ),
       onTap: onTap,
     );
   }

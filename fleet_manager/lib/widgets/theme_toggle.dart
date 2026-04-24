@@ -10,8 +10,8 @@ class ThemeToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ft = FleetTheme.of(context);
-    final c  = ft.colors;
-    
+    final c = ft.colors;
+
     return GestureDetector(
       onTap: ft.toggle,
       child: AnimatedContainer(
@@ -23,9 +23,7 @@ class ThemeToggle extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           color: c.isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE8EDFB),
           border: Border.all(
-            color: c.isDark
-                ? const Color(0x1FFFFFFF)
-                : const Color(0x14000000),
+            color: c.isDark ? const Color(0x1FFFFFFF) : const Color(0x14000000),
           ),
         ),
         child: Stack(
@@ -33,7 +31,9 @@ class ThemeToggle extends StatelessWidget {
             AnimatedAlign(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
-              alignment: c.isDark ? Alignment.centerLeft : Alignment.centerRight,
+              alignment: c.isDark
+                  ? Alignment.centerLeft
+                  : Alignment.centerRight,
               child: Container(
                 width: (height ?? 28) - 6,
                 height: (height ?? 28) - 6,

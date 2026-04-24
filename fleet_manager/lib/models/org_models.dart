@@ -4,7 +4,7 @@ class OrgTruck {
   final String plate;
   final String? model;
   final String? type;
-  final String status;       // active | on_trip | idle | maintenance
+  final String status; // active | on_trip | idle | maintenance
   final String? lastLocation;
   final DateTime? lastSeen;
   final SensorSnapshot? sensor;
@@ -23,16 +23,18 @@ class OrgTruck {
   factory OrgTruck.fromJson(Map<String, dynamic> j) {
     final latestSensor = j['latestSensor'] as Map<String, dynamic>?;
     return OrgTruck(
-      truckId:      j['truckId']  as String? ?? '',
-      plate:        j['plate']    as String? ?? '',
-      model:        j['model']    as String?,
-      type:         j['type']     as String?,
-      status:       j['status']   as String? ?? 'idle',
+      truckId: j['truckId'] as String? ?? '',
+      plate: j['plate'] as String? ?? '',
+      model: j['model'] as String?,
+      type: j['type'] as String?,
+      status: j['status'] as String? ?? 'idle',
       lastLocation: j['lastLocation'] != null
           ? '${j['lastLocation']['lat']}, ${j['lastLocation']['lng']}'
           : null,
       lastSeen: _parseTs(j['lastSeen']),
-      sensor:   latestSensor != null ? SensorSnapshot.fromJson(latestSensor) : null,
+      sensor: latestSensor != null
+          ? SensorSnapshot.fromJson(latestSensor)
+          : null,
     );
   }
 
@@ -40,23 +42,30 @@ class OrgTruck {
     if (ts == null) return null;
     if (ts is String) return DateTime.tryParse(ts);
     if (ts is Map && ts['_seconds'] != null) {
-      return DateTime.fromMillisecondsSinceEpoch((ts['_seconds'] as int) * 1000);
+      return DateTime.fromMillisecondsSinceEpoch(
+        (ts['_seconds'] as int) * 1000,
+      );
     }
     return null;
   }
 
   /// Classify as incoming (on_trip heading to facility) or inside
   bool get isIncoming => status == 'on_trip';
-  bool get isInside   => status == 'active';
+  bool get isInside => status == 'active';
   bool get isDeparted => status == 'idle' || status == 'maintenance';
 
   String get displayStatus {
     switch (status) {
-      case 'on_trip':     return 'On Trip';
-      case 'active':      return 'Active';
-      case 'idle':        return 'Idle';
-      case 'maintenance': return 'Maintenance';
-      default:            return status;
+      case 'on_trip':
+        return 'On Trip';
+      case 'active':
+        return 'Active';
+      case 'idle':
+        return 'Idle';
+      case 'maintenance':
+        return 'Maintenance';
+      default:
+        return status;
     }
   }
 }
@@ -77,18 +86,20 @@ class SensorSnapshot {
   });
 
   factory SensorSnapshot.fromJson(Map<String, dynamic> j) => SensorSnapshot(
-        speed:      (j['speed']     as num?)?.toDouble(),
-        fuelLevel:  (j['fuelLevel'] as num?)?.toDouble(),
-        loadStatus: j['loadStatus'] as String?,
-        doorStatus: j['doorStatus'] as String?,
-        receivedAt: _parseTs(j['receivedAt']),
-      );
+    speed: (j['speed'] as num?)?.toDouble(),
+    fuelLevel: (j['fuelLevel'] as num?)?.toDouble(),
+    loadStatus: j['loadStatus'] as String?,
+    doorStatus: j['doorStatus'] as String?,
+    receivedAt: _parseTs(j['receivedAt']),
+  );
 
   static DateTime? _parseTs(dynamic ts) {
     if (ts == null) return null;
     if (ts is String) return DateTime.tryParse(ts);
     if (ts is Map && ts['_seconds'] != null) {
-      return DateTime.fromMillisecondsSinceEpoch((ts['_seconds'] as int) * 1000);
+      return DateTime.fromMillisecondsSinceEpoch(
+        (ts['_seconds'] as int) * 1000,
+      );
     }
     return null;
   }
@@ -113,15 +124,15 @@ class FleetSummary {
   });
 
   factory FleetSummary.fromJson(Map<String, dynamic> j) {
-    final trucks  = j['trucks']  as Map<String, dynamic>? ?? {};
+    final trucks = j['trucks'] as Map<String, dynamic>? ?? {};
     final drivers = j['drivers'] as Map<String, dynamic>? ?? {};
     return FleetSummary(
-      totalTrucks:      trucks['total']       as int? ?? 0,
-      activeTrucks:     trucks['active']      as int? ?? 0,
-      onTripTrucks:     trucks['onTrip']      as int? ?? 0,
-      idleTrucks:       trucks['idle']        as int? ?? 0,
-      totalDrivers:     drivers['total']      as int? ?? 0,
-      availableDrivers: drivers['available']  as int? ?? 0,
+      totalTrucks: trucks['total'] as int? ?? 0,
+      activeTrucks: trucks['active'] as int? ?? 0,
+      onTripTrucks: trucks['onTrip'] as int? ?? 0,
+      idleTrucks: trucks['idle'] as int? ?? 0,
+      totalDrivers: drivers['total'] as int? ?? 0,
+      availableDrivers: drivers['available'] as int? ?? 0,
     );
   }
 
@@ -134,11 +145,7 @@ class ActivityLog {
   final DateTime time;
   final ActivityType type;
 
-  ActivityLog({
-    required this.message,
-    required this.time,
-    required this.type,
-  });
+  ActivityLog({required this.message, required this.time, required this.type});
 
   static ActivityLog fromTruck(OrgTruck truck) {
     switch (truck.status) {

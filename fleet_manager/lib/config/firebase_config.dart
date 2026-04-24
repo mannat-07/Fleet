@@ -11,12 +11,12 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey:            'AIzaSyD08LjWN7pxA3fmTBCN2eF75oJbPiyO12o',
-    authDomain:        'hackindia-2dd25.firebaseapp.com',
-    projectId:         'hackindia-2dd25',
-    storageBucket:     'hackindia-2dd25.firebasestorage.app',
+    apiKey: 'AIzaSyD08LjWN7pxA3fmTBCN2eF75oJbPiyO12o',
+    authDomain: 'hackindia-2dd25.firebaseapp.com',
+    projectId: 'hackindia-2dd25',
+    storageBucket: 'hackindia-2dd25.firebasestorage.app',
     messagingSenderId: '756694360930',
-    appId:             '1:756694360930:web:518af63a4e9530cbe6823b',
-    measurementId:     'G-0HDBVCVZ8T',
+    appId: '1:756694360930:web:518af63a4e9530cbe6823b',
+    measurementId: 'G-0HDBVCVZ8T',
   );
 }
