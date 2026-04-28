@@ -4,7 +4,10 @@ const { getDb, COLLECTIONS } = require('../config/firebase');
 
 const VALID_STATUSES = ['active', 'on_trip', 'idle', 'maintenance'];
 
-async function addTruck({ ownerId, plate, model, type, year }) {
+/**
+ * @param {{ ownerId, plate, model, type, year, driverId? }} params
+ */
+async function addTruck({ ownerId, plate, model, type, year, driverId }) {
   const db = getDb();
 
   // Unique plate check
@@ -24,30 +27,66 @@ async function addTruck({ ownerId, plate, model, type, year }) {
     type:  type  || null,
     year:  year  || null,
     status: 'idle',
-    assignedDriverId: null,
+    assignedDriverId: driverId || null,
     lastLocation: null,
     lastSeen: null,
     createdAt: now, updatedAt: now,
   };
 
-  await db.collection(COLLECTIONS.TRUCKS).doc(truckId).set(truck);
+  if (driverId) {
+    // Race-condition guard: verify driver is still available
+    const driverDoc = await db.collection(COLLECTIONS.DRIVERS).doc(driverId).get();
+    if (!driverDoc.exists) {
+      const err = new Error('Driver not found'); err.statusCode = 404; throw err;
+    }
+    const driverData = driverDoc.data();
+    if (driverData.ownerId !== ownerId) {
+      const err = new Error('Forbidden'); err.statusCode = 403; throw err;
+    }
+    if (driverData.status !== 'available' || driverData.assignedTruckId !== null) {
+      const err = new Error('Selected driver is no longer available'); err.statusCode = 409; throw err;
+    }
+
+    // Atomic batch write: create truck + update driver
+    const batch = db.batch();
+    batch.set(db.collection(COLLECTIONS.TRUCKS).doc(truckId), truck);
+    batch.update(driverDoc.ref, {
+      assignedTruckId: truckId,
+      status: 'on_trip',
+      updatedAt: now,
+    });
+    await batch.commit();
+  } else {
+    await db.collection(COLLECTIONS.TRUCKS).doc(truckId).set(truck);
+  }
+
   return truck;
 }
 
-async function getTrucks(ownerId) {
+/**
+ * @param {string} ownerId
+ * @param {{ status?: string }} filters
+ */
+async function getTrucks(ownerId, filters = {}) {
   const db   = getDb();
-  // Fetch without orderBy to avoid requiring a composite index.
-  // Sort in-memory by createdAt descending.
   const snap = await db.collection(COLLECTIONS.TRUCKS)
     .where('ownerId', '==', ownerId)
     .get();
-  return snap.docs
+
+  let trucks = snap.docs
     .map(d => d.data())
     .sort((a, b) => {
       const ta = a.createdAt?.toMillis?.() ?? 0;
       const tb = b.createdAt?.toMillis?.() ?? 0;
       return tb - ta;
     });
+
+  // In-memory filter for idle trucks (avoids composite index)
+  if (filters.status === 'idle') {
+    trucks = trucks.filter(t => t.status === 'idle' && t.assignedDriverId === null);
+  }
+
+  return trucks;
 }
 
 async function getTruckById(truckId, ownerId) {
@@ -78,7 +117,20 @@ async function deleteTruck(truckId, ownerId) {
   const doc = await db.collection(COLLECTIONS.TRUCKS).doc(truckId).get();
   if (!doc.exists) { const err = new Error('Truck not found'); err.statusCode = 404; throw err; }
   if (doc.data().ownerId !== ownerId) { const err = new Error('Forbidden'); err.statusCode = 403; throw err; }
-  await doc.ref.delete();
+
+  const batch = db.batch();
+  batch.delete(doc.ref);
+
+  // Cascade: delete associated insurance record if it exists
+  const insuranceSnap = await db.collection(COLLECTIONS.INSURANCE)
+    .where('truckId', '==', truckId)
+    .limit(1)
+    .get();
+  if (!insuranceSnap.empty) {
+    batch.delete(insuranceSnap.docs[0].ref);
+  }
+
+  await batch.commit();
 }
 
 module.exports = { addTruck, getTrucks, getTruckById, updateTruckStatus, deleteTruck };

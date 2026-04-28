@@ -19,7 +19,8 @@ async function deleteDriver(req, res, next) {
 
 async function getDrivers(req, res, next) {
   try {
-    const drivers = await driverService.getDrivers(req.user.uid);
+    const filters = req.query.status ? { status: req.query.status } : {};
+    const drivers = await driverService.getDrivers(req.user.uid, filters);
     return success(res, { drivers, count: drivers.length });
   } catch (err) { next(err); }
 }

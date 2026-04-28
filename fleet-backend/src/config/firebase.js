@@ -147,6 +147,7 @@ const COLLECTIONS = {
   DRIVERS:     'drivers',
   SENSOR_DATA: 'sensorData',
   EARNINGS:    'earnings',
+  INSURANCE:   'insurance',
 };
 
 module.exports = { initFirebase, getDb, getFirebaseStatus, COLLECTIONS };

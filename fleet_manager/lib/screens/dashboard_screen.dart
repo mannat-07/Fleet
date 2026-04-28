@@ -11,6 +11,7 @@ import 'drivers_screen.dart';
 import 'insurance_screen.dart';
 import 'earnings_screen.dart';
 import 'profile_screen.dart';
+import 'notifications_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -27,6 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   // API data
   Map<String, dynamic>? _summary;
   List<double> _chartSpots = [];
+  int _notificationCount = 0;
 
   @override
   void initState() {
@@ -73,12 +75,14 @@ class _DashboardScreenState extends State<DashboardScreen>
         ApiService.getEarnings(period: 'weekly'),
         ApiService.getTrucks(),
         ApiService.getDrivers(),
+        ApiService.getNotifications(),
       ]);
 
       final summary = results[0] as Map<String, dynamic>?;
       final earnings = results[1] as Map<String, dynamic>?;
       final trucksRaw = results[2] as List<Map<String, dynamic>>;
       final driversRaw = results[3] as List<Map<String, dynamic>>;
+      final notifData = results[4] as Map<String, dynamic>;
 
       final chartData = (earnings?['chartData'] as List? ?? [])
           .map((e) => ((e as Map)['amount'] as num?)?.toDouble() ?? 0.0)
@@ -95,9 +99,13 @@ class _DashboardScreenState extends State<DashboardScreen>
       // Rebuild insurance from real trucks (or keep demo if trucks still empty)
       AppStore.insurance = DemoData.insurance(AppStore.trucks);
 
+      final notifCount = notifData['count'] as int? ?? 0;
+      AppStore.notificationCount = notifCount;
+
       setState(() {
         _summary = summary;
         _chartSpots = chartData.isNotEmpty ? chartData : _demoEarningsSpots();
+        _notificationCount = notifCount;
       });
     } catch (_) {
       // API failed — demo data already showing, just clear loading flag
@@ -284,7 +292,20 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           const ThemeToggle(),
           const SizedBox(width: 10),
-          _NotificationBell(c: c),
+          _NotificationBell(
+            c: c,
+            count: _notificationCount,
+            onTap: () async {
+              await Navigator.push(
+                context,
+                AppMotionRoute.fadeSlideScale(const NotificationsScreen()),
+              );
+              if (mounted) {
+                setState(() {});
+                _loadSummary();
+              }
+            },
+          ),
           const SizedBox(width: 10),
           GestureDetector(
             onTap: () => _pushAndRefresh(const ProfileScreen()),
@@ -453,35 +474,54 @@ class _ActivityRow extends StatelessWidget {
 
 class _NotificationBell extends StatelessWidget {
   final FleetColors c;
-  const _NotificationBell({required this.c});
+  final int count;
+  final VoidCallback onTap;
+  const _NotificationBell({
+    required this.c,
+    required this.count,
+    required this.onTap,
+  });
 
   @override
-  Widget build(BuildContext context) => Stack(
-    children: [
-      Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: c.isDark ? const Color(0x12FFFFFF) : c.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: c.cardBorder),
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Stack(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: c.isDark ? const Color(0x12FFFFFF) : c.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: c.cardBorder),
+              ),
+              child: Icon(Icons.notifications_outlined, color: c.text, size: 20),
+            ),
+            if (count > 0)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  child: Text(
+                    count > 99 ? '99+' : '$count',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
         ),
-        child: Icon(Icons.notifications_outlined, color: c.text, size: 20),
-      ),
-      Positioned(
-        top: 8,
-        right: 8,
-        child: Container(
-          width: 8,
-          height: 8,
-          decoration: const BoxDecoration(
-            color: AppColors.orangeStart,
-            shape: BoxShape.circle,
-          ),
-        ),
-      ),
-    ],
-  );
+      );
 }
 
 // ─── Tiles ────────────────────────────────────────────────────────────────────

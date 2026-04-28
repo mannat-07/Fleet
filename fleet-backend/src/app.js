@@ -7,11 +7,13 @@ const rateLimit  = require('express-rate-limit');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 // Routes
-const authRoutes        = require('./routes/auth');
-const truckRoutes       = require('./routes/trucks');
-const driverRoutes      = require('./routes/drivers');
-const iotRoutes         = require('./routes/iot');
-const aggregationRoutes = require('./routes/aggregation');
+const authRoutes         = require('./routes/auth');
+const truckRoutes        = require('./routes/trucks');
+const driverRoutes       = require('./routes/drivers');
+const iotRoutes          = require('./routes/iot');
+const aggregationRoutes  = require('./routes/aggregation');
+const insuranceRoutes    = require('./routes/insurance');
+const notificationRoutes = require('./routes/notifications');
 const app = express();
 
 // ─── Security ────────────────────────────────────────────────────────────────
@@ -54,11 +56,13 @@ app.get('/health', (req, res) => {
 });
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
-app.use('/api/auth',    authRoutes);
-app.use('/api/trucks',  truckRoutes);
-app.use('/api/drivers', driverRoutes);
-app.use('/api/iot',     iotRoutes);
-app.use('/api/fleet',   aggregationRoutes);
+app.use('/api/auth',          authRoutes);
+app.use('/api/trucks',        truckRoutes);
+app.use('/api/drivers',       driverRoutes);
+app.use('/api/iot',           iotRoutes);
+app.use('/api/fleet',         aggregationRoutes);
+app.use('/api/insurance',     insuranceRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // ─── Error handling ───────────────────────────────────────────────────────────
 app.use(notFoundHandler);

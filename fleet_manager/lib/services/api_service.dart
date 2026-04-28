@@ -92,9 +92,10 @@ class ApiService {
 
   // ── Trucks ───────────────────────────────────────────────────────────────────
 
-  static Future<List<Map<String, dynamic>>> getTrucks() async {
+  static Future<List<Map<String, dynamic>>> getTrucks({String? status}) async {
     try {
-      final data = await _get('/trucks');
+      final path = status != null ? '/trucks?status=$status' : '/trucks';
+      final data = await _get(path);
       if (data == null) return [];
       return ((data as Map)['trucks'] as List? ?? [])
           .cast<Map<String, dynamic>>();
@@ -131,9 +132,10 @@ class ApiService {
 
   // ── Drivers ──────────────────────────────────────────────────────────────────
 
-  static Future<List<Map<String, dynamic>>> getDrivers() async {
+  static Future<List<Map<String, dynamic>>> getDrivers({String? status}) async {
     try {
-      final data = await _get('/drivers');
+      final path = status != null ? '/drivers?status=$status' : '/drivers';
+      final data = await _get(path);
       if (data == null) return [];
       return ((data as Map)['drivers'] as List? ?? [])
           .cast<Map<String, dynamic>>();
@@ -158,6 +160,70 @@ class ApiService {
     } catch (e) {
       throw ApiException('Failed to delete driver: $e');
     }
+  }
+
+  // ── Insurance ─────────────────────────────────────────────────────────────
+
+  static Future<List<Map<String, dynamic>>> getInsuranceRecords() async {
+    try {
+      final data = await _get('/insurance');
+      if (data == null) return [];
+      return ((data as Map)['insurance'] as List? ?? [])
+          .cast<Map<String, dynamic>>();
+    } catch (e) {
+      throw ApiException('Failed to load insurance records: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> addInsuranceRecord(
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      return (await _post('/insurance', body)) as Map<String, dynamic>;
+    } catch (e) {
+      throw ApiException('Failed to add insurance record: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateInsuranceRecord(
+    String insuranceId,
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      return (await _patch('/insurance/$insuranceId', body)) as Map<String, dynamic>;
+    } catch (e) {
+      throw ApiException('Failed to update insurance record: $e');
+    }
+  }
+
+  static Future<void> deleteInsuranceRecord(String insuranceId) async {
+    try {
+      await _delete('/insurance/$insuranceId');
+    } catch (e) {
+      throw ApiException('Failed to delete insurance record: $e');
+    }
+  }
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> getNotifications() async {
+    try {
+      final data = await _get('/notifications');
+      if (data == null) return {'notifications': [], 'count': 0};
+      return data as Map<String, dynamic>;
+    } catch (e) {
+      throw ApiException('Failed to load notifications: $e');
+    }
+  }
+
+  // ── Convenience filters ───────────────────────────────────────────────────
+
+  static Future<List<Map<String, dynamic>>> getIdleTrucks() async {
+    return getTrucks(status: 'idle');
+  }
+
+  static Future<List<Map<String, dynamic>>> getAvailableDrivers() async {
+    return getDrivers(status: 'available');
   }
 
   // ── Fleet summary (owner dashboard) ─────────────────────────────────────────
@@ -219,14 +285,7 @@ class ApiService {
   }
 
   static Future<List<Map<String, dynamic>>> getAllTrucks() async {
-    try {
-      final data = await _get('/trucks');
-      if (data == null) return [];
-      return ((data as Map)['trucks'] as List? ?? [])
-          .cast<Map<String, dynamic>>();
-    } catch (e) {
-      throw ApiException('Failed to load trucks: $e');
-    }
+    return getTrucks();
   }
 }
 

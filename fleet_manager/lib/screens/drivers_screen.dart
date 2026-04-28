@@ -453,6 +453,11 @@ class _DriverFormSheetState extends State<_DriverFormSheet> {
   bool _loading = false;
   String? _error;
 
+  // Idle truck dropdown state
+  List<Map<String, dynamic>> _idleTrucks = [];
+  bool _trucksLoadFailed = false;
+  String? _selectedTruckId;
+
   bool get _isEdit => widget.existing != null;
 
   @override
@@ -464,6 +469,22 @@ class _DriverFormSheetState extends State<_DriverFormSheet> {
     _licCtrl = TextEditingController(text: e?.licenseNumber ?? '');
     _emailCtrl = TextEditingController();
     _passCtrl = TextEditingController();
+
+    // Only fetch idle trucks in add mode
+    if (!_isEdit) {
+      _fetchIdleTrucks();
+    }
+  }
+
+  Future<void> _fetchIdleTrucks() async {
+    try {
+      final trucks = await ApiService.getIdleTrucks();
+      if (!mounted) return;
+      setState(() => _idleTrucks = trucks);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _trucksLoadFailed = true);
+    }
   }
 
   @override
@@ -500,6 +521,7 @@ class _DriverFormSheetState extends State<_DriverFormSheet> {
         if (_licCtrl.text.trim().isNotEmpty)
           'licenseNumber': _licCtrl.text.trim(),
         if (_passCtrl.text.trim().isNotEmpty) 'password': _passCtrl.text.trim(),
+        if (_selectedTruckId != null) 'truckId': _selectedTruckId,
       };
       final result = await ApiService.addDriver(body);
       if (!mounted) return;
@@ -649,6 +671,68 @@ class _DriverFormSheetState extends State<_DriverFormSheet> {
               icon: Icons.badge_outlined,
               controller: _licCtrl,
             ),
+            if (!_isEdit) ...[
+              const SizedBox(height: 14),
+              _Label('Assign Truck (optional)', c),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: c.inputBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: c.inputBorder, width: 1.5),
+                ),
+                child: _trucksLoadFailed
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded,
+                                color: c.textSub, size: 16),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Could not load trucks',
+                              style: TextStyle(color: c.textSub, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      )
+                    : DropdownButtonHideUnderline(
+                        child: DropdownButton<String?>(
+                          value: _selectedTruckId,
+                          isExpanded: true,
+                          dropdownColor: c.sheetBg,
+                          style: TextStyle(color: c.text, fontSize: 14),
+                          icon: Icon(Icons.keyboard_arrow_down, color: c.textSub),
+                          hint: Text(
+                            _idleTrucks.isEmpty
+                                ? 'No idle trucks available'
+                                : 'Select a truck',
+                            style: TextStyle(color: c.textSub, fontSize: 14),
+                          ),
+                          items: [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text(
+                                'None',
+                                style: TextStyle(color: c.textSub),
+                              ),
+                            ),
+                            ..._idleTrucks.map((t) => DropdownMenuItem<String?>(
+                                  value: t['truckId'] as String?,
+                                  child: Text(
+                                    '${t['plate']} — ${t['model'] ?? ''}',
+                                    style: TextStyle(color: c.text),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                )),
+                          ],
+                          onChanged: _idleTrucks.isEmpty
+                              ? null
+                              : (v) => setState(() => _selectedTruckId = v),
+                        ),
+                      ),
+              ),
+            ],
             const SizedBox(height: 28),
             CustomButton(
               label: _isEdit ? 'Save Changes' : 'Add Driver & Create Account',

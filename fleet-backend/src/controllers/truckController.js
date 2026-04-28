@@ -10,7 +10,8 @@ async function addTruck(req, res, next) {
 
 async function getTrucks(req, res, next) {
   try {
-    const trucks = await truckService.getTrucks(req.user.uid);
+    const filters = req.query.status ? { status: req.query.status } : {};
+    const trucks = await truckService.getTrucks(req.user.uid, filters);
     return success(res, { trucks, count: trucks.length });
   } catch (err) { next(err); }
 }

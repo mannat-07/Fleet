@@ -120,37 +120,88 @@ class DriverModel {
 
 // ─── Insurance ───────────────────────────────────────────────────────────────
 class InsuranceModel {
+  final String insuranceId;
+  final String truckId;
   final String truckPlate;
-  final String status;
-  final String expiryDate;
+  final String policyNumber;
   final String provider;
+  final String startDate;
+  final String expiryDate;
+  final String status;
+  final int daysUntilExpiry;
 
   InsuranceModel({
+    required this.insuranceId,
+    required this.truckId,
     required this.truckPlate,
-    required this.status,
-    required this.expiryDate,
+    required this.policyNumber,
     required this.provider,
+    required this.startDate,
+    required this.expiryDate,
+    required this.status,
+    required this.daysUntilExpiry,
   });
 
   factory InsuranceModel.fromJson(Map<String, dynamic> j) => InsuranceModel(
-    truckPlate: j['plate'] as String? ?? j['truckPlate'] as String? ?? '',
-    status: _mapStatus(
-      j['insuranceStatus'] as String? ?? j['status'] as String? ?? '',
-    ),
-    expiryDate:
-        j['insuranceExpiry'] as String? ?? j['expiryDate'] as String? ?? '',
-    provider:
-        j['insuranceProvider'] as String? ?? j['provider'] as String? ?? '',
+    insuranceId: j['insuranceId'] as String? ?? '',
+    truckId: j['truckId'] as String? ?? '',
+    truckPlate: j['truckPlate'] as String? ?? j['plate'] as String? ?? '',
+    policyNumber: j['policyNumber'] as String? ?? '',
+    provider: j['provider'] as String? ?? '',
+    startDate: j['startDate'] as String? ?? '',
+    expiryDate: j['expiryDate'] as String? ?? '',
+    status: _mapStatus(j['status'] as String? ?? ''),
+    daysUntilExpiry: (j['daysUntilExpiry'] as num?)?.toInt() ?? 0,
   );
 
   static String _mapStatus(String s) {
-    final lower = s.toLowerCase();
-    if (lower == 'valid') return 'Valid';
-    if (lower == 'expiring') return 'Expiring';
-    if (lower == 'expired') return 'Expired';
-    if (lower == 'pending') return 'Pending';
-    return 'Unknown';
+    switch (s.toLowerCase()) {
+      case 'valid': return 'Valid';
+      case 'expiring soon': return 'Expiring Soon';
+      case 'expired': return 'Expired';
+      case 'pending': return 'Pending';
+      default: return s.isEmpty ? 'Pending' : s;
+    }
   }
+
+  /// Creates a pending-only entry for a truck with no insurance record
+  factory InsuranceModel.pending({required String truckId, required String truckPlate}) =>
+    InsuranceModel(
+      insuranceId: '',
+      truckId: truckId,
+      truckPlate: truckPlate,
+      policyNumber: '',
+      provider: '',
+      startDate: '',
+      expiryDate: '',
+      status: 'Pending',
+      daysUntilExpiry: 0,
+    );
+}
+
+// ─── Notification ─────────────────────────────────────────────────────────────
+class NotificationModel {
+  final String type;
+  final String truckId;
+  final String truckPlate;
+  final int? daysUntilExpiry;
+  final String message;
+
+  NotificationModel({
+    required this.type,
+    required this.truckId,
+    required this.truckPlate,
+    this.daysUntilExpiry,
+    required this.message,
+  });
+
+  factory NotificationModel.fromJson(Map<String, dynamic> j) => NotificationModel(
+    type: j['type'] as String? ?? '',
+    truckId: j['truckId'] as String? ?? '',
+    truckPlate: j['truckPlate'] as String? ?? '',
+    daysUntilExpiry: (j['daysUntilExpiry'] as num?)?.toInt(),
+    message: j['message'] as String? ?? '',
+  );
 }
 
 // ─── User / Profile ──────────────────────────────────────────────────────────
@@ -195,6 +246,8 @@ class AppStore {
   static List<TruckModel> trucks = [];
   static List<DriverModel> drivers = [];
   static List<InsuranceModel> insurance = [];
+  static List<NotificationModel> notifications = [];
+  static int notificationCount = 0;
 
   // Profile populated after login
   static UserProfile profile = const UserProfile(
@@ -318,24 +371,27 @@ class DemoData {
       'ICICI Lombard',
       'Oriental Insurance',
     ];
-    final statuses = ['Valid', 'Valid', 'Valid', 'Expiring', 'Expired'];
-    final expiries = [
-      '15 Dec 2026',
-      '22 Aug 2026',
-      '10 Nov 2026',
-      '30 May 2026',
-      '01 Mar 2026',
-    ];
+    final statuses = ['Valid', 'Valid', 'Valid', 'Expiring Soon', 'Expired'];
+    final policyNumbers = ['POL-12345', 'POL-67890', 'POL-11223', 'POL-44556', 'POL-77889'];
+    final startDates = ['2025-01-15', '2024-08-22', '2025-11-10', '2025-05-30', '2025-03-01'];
+    final expiries = ['2026-01-15', '2026-08-22', '2026-11-10', '2026-05-30', '2026-03-01'];
+    final daysRemaining = [250, 300, 350, 30, -50];
+    
     final source = (trucks != null && trucks.isNotEmpty)
         ? trucks
         : DemoData.trucks();
     return List.generate(
       source.length,
       (i) => InsuranceModel(
+        insuranceId: 'demo-ins-$i',
+        truckId: source[i].id,
         truckPlate: source[i].plate,
-        status: statuses[i % statuses.length],
-        expiryDate: expiries[i % expiries.length],
+        policyNumber: policyNumbers[i % policyNumbers.length],
         provider: providers[i % providers.length],
+        startDate: startDates[i % startDates.length],
+        expiryDate: expiries[i % expiries.length],
+        status: statuses[i % statuses.length],
+        daysUntilExpiry: daysRemaining[i % daysRemaining.length],
       ),
     );
   }

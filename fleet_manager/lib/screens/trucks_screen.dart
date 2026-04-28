@@ -322,6 +322,11 @@ class _TruckFormSheetState extends State<_TruckFormSheet> {
   bool _loading = false;
   String? _error;
 
+  // Available driver dropdown state
+  List<Map<String, dynamic>> _availableDrivers = [];
+  bool _driversLoadFailed = false;
+  String? _selectedDriverId;
+
   bool get _isEdit => widget.existing != null;
   static const _types = ['heavy', 'medium', 'light', 'tanker', 'flatbed'];
   static const _statuses = ['idle', 'active', 'on_trip', 'maintenance'];
@@ -335,6 +340,22 @@ class _TruckFormSheetState extends State<_TruckFormSheet> {
     _yearCtrl = TextEditingController(text: e?.year?.toString() ?? '');
     _type = e?.type ?? 'heavy';
     _status = e?.status ?? 'idle';
+
+    // Only fetch available drivers in add mode
+    if (!_isEdit) {
+      _fetchAvailableDrivers();
+    }
+  }
+
+  Future<void> _fetchAvailableDrivers() async {
+    try {
+      final drivers = await ApiService.getAvailableDrivers();
+      if (!mounted) return;
+      setState(() => _availableDrivers = drivers);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _driversLoadFailed = true);
+    }
   }
 
   @override
@@ -364,6 +385,7 @@ class _TruckFormSheetState extends State<_TruckFormSheet> {
         'status': _status,
         if (_yearCtrl.text.trim().isNotEmpty)
           'year': int.tryParse(_yearCtrl.text.trim()),
+        if (_selectedDriverId != null) 'driverId': _selectedDriverId,
       };
       final result = await ApiService.addTruck(body);
       if (!mounted) return;
@@ -515,6 +537,68 @@ class _TruckFormSheetState extends State<_TruckFormSheet> {
               c: c,
               onChanged: (v) => setState(() => _status = v!),
             ),
+            if (!_isEdit) ...[
+              const SizedBox(height: 14),
+              _Label('Assign Driver (optional)', c),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: c.inputBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: c.inputBorder, width: 1.5),
+                ),
+                child: _driversLoadFailed
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded,
+                                color: c.textSub, size: 16),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Could not load drivers',
+                              style: TextStyle(color: c.textSub, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      )
+                    : DropdownButtonHideUnderline(
+                        child: DropdownButton<String?>(
+                          value: _selectedDriverId,
+                          isExpanded: true,
+                          dropdownColor: c.sheetBg,
+                          style: TextStyle(color: c.text, fontSize: 14),
+                          icon: Icon(Icons.keyboard_arrow_down, color: c.textSub),
+                          hint: Text(
+                            _availableDrivers.isEmpty
+                                ? 'No available drivers'
+                                : 'Select a driver',
+                            style: TextStyle(color: c.textSub, fontSize: 14),
+                          ),
+                          items: [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text(
+                                'None',
+                                style: TextStyle(color: c.textSub),
+                              ),
+                            ),
+                            ..._availableDrivers.map((d) => DropdownMenuItem<String?>(
+                                  value: d['driverId'] as String?,
+                                  child: Text(
+                                    d['name'] as String? ?? '',
+                                    style: TextStyle(color: c.text),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                )),
+                          ],
+                          onChanged: _availableDrivers.isEmpty
+                              ? null
+                              : (v) => setState(() => _selectedDriverId = v),
+                        ),
+                      ),
+              ),
+            ],
             const SizedBox(height: 28),
             CustomButton(
               label: _isEdit ? 'Save Changes' : 'Add Truck',
