@@ -148,6 +148,7 @@ class InsuranceModel {
     if (lower == 'valid') return 'Valid';
     if (lower == 'expiring') return 'Expiring';
     if (lower == 'expired') return 'Expired';
+    if (lower == 'pending') return 'Pending';
     return 'Unknown';
   }
 }
@@ -226,6 +227,164 @@ class AppStore {
     final parts = name.trim().split(' ');
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+}
+
+// ─── Demo data helpers ───────────────────────────────────────────────────────
+class DemoData {
+  static List<TruckModel> trucks() => [
+    TruckModel(
+      id: 'd1',
+      plate: 'MH12 AB 1234',
+      model: 'Tata Prima 4928.S',
+      type: 'heavy',
+      status: 'on_trip',
+      location: 'Mumbai → Pune',
+      year: 2021,
+    ),
+    TruckModel(
+      id: 'd2',
+      plate: 'DL08 CD 5678',
+      model: 'Ashok Leyland 3518',
+      type: 'heavy',
+      status: 'active',
+      location: 'Delhi Hub',
+      year: 2020,
+    ),
+    TruckModel(
+      id: 'd3',
+      plate: 'KA05 EF 9012',
+      model: 'Eicher Pro 6031',
+      type: 'medium',
+      status: 'idle',
+      location: 'Bangalore Depot',
+      year: 2022,
+    ),
+    TruckModel(
+      id: 'd4',
+      plate: 'GJ01 GH 3456',
+      model: 'Tata LPT 3118',
+      type: 'light',
+      status: 'on_trip',
+      location: 'Ahmedabad → Surat',
+      year: 2019,
+    ),
+    TruckModel(
+      id: 'd5',
+      plate: 'TN22 IJ 7890',
+      model: 'BharatBenz 3523R',
+      type: 'tanker',
+      status: 'active',
+      location: 'Chennai Port',
+      year: 2023,
+    ),
+  ];
+
+  static List<DriverModel> drivers() => [
+    DriverModel(
+      id: 'd1',
+      name: 'Rajesh Kumar',
+      phone: '+91 98765 43210',
+      licenseNumber: 'MH-0120110012345',
+      assignedTruck: 'MH12 AB 1234',
+      status: 'On Trip',
+      avatarInitials: 'RK',
+    ),
+    DriverModel(
+      id: 'd2',
+      name: 'Suresh Patel',
+      phone: '+91 87654 32109',
+      licenseNumber: 'DL-0420190054321',
+      assignedTruck: 'DL08 CD 5678',
+      status: 'Available',
+      avatarInitials: 'SP',
+    ),
+    DriverModel(
+      id: 'd3',
+      name: 'Vikram Yadav',
+      phone: '+91 65432 10987',
+      licenseNumber: 'GJ-0120170076543',
+      assignedTruck: 'GJ01 GH 3456',
+      status: 'On Trip',
+      avatarInitials: 'VY',
+    ),
+  ];
+
+  static List<InsuranceModel> insurance([List<TruckModel>? trucks]) {
+    final providers = [
+      'HDFC Ergo',
+      'New India Assurance',
+      'Bajaj Allianz',
+      'ICICI Lombard',
+      'Oriental Insurance',
+    ];
+    final statuses = ['Valid', 'Valid', 'Valid', 'Expiring', 'Expired'];
+    final expiries = [
+      '15 Dec 2026',
+      '22 Aug 2026',
+      '10 Nov 2026',
+      '30 May 2026',
+      '01 Mar 2026',
+    ];
+    final source = (trucks != null && trucks.isNotEmpty)
+        ? trucks
+        : DemoData.trucks();
+    return List.generate(
+      source.length,
+      (i) => InsuranceModel(
+        truckPlate: source[i].plate,
+        status: statuses[i % statuses.length],
+        expiryDate: expiries[i % expiries.length],
+        provider: providers[i % providers.length],
+      ),
+    );
+  }
+
+  static Map<String, dynamic> earnings({required String period}) {
+    final weeklyValues = [
+      42000.0,
+      58000.0,
+      35000.0,
+      71000.0,
+      63000.0,
+      80000.0,
+      55000.0,
+    ];
+    final weeklyLabels = [
+      '2024-05-13',
+      '2024-05-14',
+      '2024-05-15',
+      '2024-05-16',
+      '2024-05-17',
+      '2024-05-18',
+      '2024-05-19',
+    ];
+    final monthlyValues = [
+      280000.0,
+      320000.0,
+      360000.0,
+      410000.0,
+      390000.0,
+      450000.0,
+    ];
+    final monthlyLabels = [
+      '2024-01-01',
+      '2024-02-01',
+      '2024-03-01',
+      '2024-04-01',
+      '2024-05-01',
+      '2024-06-01',
+    ];
+
+    final values = period == 'monthly' ? monthlyValues : weeklyValues;
+    final labels = period == 'monthly' ? monthlyLabels : weeklyLabels;
+    final chartData = List.generate(
+      values.length,
+      (i) => {'date': labels[i], 'amount': values[i]},
+    );
+    final total = values.fold<double>(0, (a, b) => a + b);
+
+    return {'total': total, 'records': values.length, 'chartData': chartData};
   }
 }
 

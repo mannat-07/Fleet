@@ -52,10 +52,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// Fills AppStore with demo data right away so tiles show content instantly.
   /// Real API data overwrites this once it loads.
   void _seedDemoData() {
-    if (AppStore.trucks.isEmpty) AppStore.trucks = _demoTrucks();
-    if (AppStore.drivers.isEmpty) AppStore.drivers = _demoDrivers();
+    if (AppStore.trucks.isEmpty) AppStore.trucks = DemoData.trucks();
+    if (AppStore.drivers.isEmpty) AppStore.drivers = DemoData.drivers();
     if (AppStore.insurance.isEmpty)
-      AppStore.insurance = _demoInsurance(AppStore.trucks);
+      AppStore.insurance = DemoData.insurance(AppStore.trucks);
     if (_chartSpots.isEmpty) _chartSpots = _demoEarningsSpots();
   }
 
@@ -93,7 +93,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         AppStore.drivers = driversRaw.map(DriverModel.fromJson).toList();
 
       // Rebuild insurance from real trucks (or keep demo if trucks still empty)
-      AppStore.insurance = _demoInsurance(AppStore.trucks);
+      AppStore.insurance = DemoData.insurance(AppStore.trucks);
 
       setState(() {
         _summary = summary;
@@ -106,121 +106,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ── Demo data ───────────────────────────────────────────────────────────────
-  static List<TruckModel> _demoTrucks() => [
-    TruckModel(
-      id: 'd1',
-      plate: 'MH12 AB 1234',
-      model: 'Tata Prima 4928.S',
-      type: 'heavy',
-      status: 'on_trip',
-      location: 'Mumbai → Pune',
-      year: 2021,
-    ),
-    TruckModel(
-      id: 'd2',
-      plate: 'DL08 CD 5678',
-      model: 'Ashok Leyland 3518',
-      type: 'heavy',
-      status: 'active',
-      location: 'Delhi Hub',
-      year: 2020,
-    ),
-    TruckModel(
-      id: 'd3',
-      plate: 'KA05 EF 9012',
-      model: 'Eicher Pro 6031',
-      type: 'medium',
-      status: 'idle',
-      location: 'Bangalore Depot',
-      year: 2022,
-    ),
-    TruckModel(
-      id: 'd4',
-      plate: 'GJ01 GH 3456',
-      model: 'Tata LPT 3118',
-      type: 'light',
-      status: 'on_trip',
-      location: 'Ahmedabad → Surat',
-      year: 2019,
-    ),
-    TruckModel(
-      id: 'd5',
-      plate: 'TN22 IJ 7890',
-      model: 'BharatBenz 3523R',
-      type: 'tanker',
-      status: 'active',
-      location: 'Chennai Port',
-      year: 2023,
-    ),
-  ];
-
-  static List<DriverModel> _demoDrivers() => [
-    DriverModel(
-      id: 'd1',
-      name: 'Rajesh Kumar',
-      phone: '+91 98765 43210',
-      licenseNumber: 'MH-0120110012345',
-      assignedTruck: 'MH12 AB 1234',
-      status: 'On Trip',
-      avatarInitials: 'RK',
-    ),
-    DriverModel(
-      id: 'd2',
-      name: 'Suresh Patel',
-      phone: '+91 87654 32109',
-      licenseNumber: 'DL-0420190054321',
-      assignedTruck: 'DL08 CD 5678',
-      status: 'Available',
-      avatarInitials: 'SP',
-    ),
-    DriverModel(
-      id: 'd3',
-      name: 'Vikram Yadav',
-      phone: '+91 65432 10987',
-      licenseNumber: 'GJ-0120170076543',
-      assignedTruck: 'GJ01 GH 3456',
-      status: 'On Trip',
-      avatarInitials: 'VY',
-    ),
-  ];
-
-  static List<InsuranceModel> _demoInsurance(List<TruckModel> trucks) {
-    final providers = [
-      'HDFC Ergo',
-      'New India Assurance',
-      'Bajaj Allianz',
-      'ICICI Lombard',
-      'Oriental Insurance',
-    ];
-    final statuses = ['Valid', 'Valid', 'Valid', 'Expiring', 'Expired'];
-    final expiries = [
-      '15 Dec 2026',
-      '22 Aug 2026',
-      '10 Nov 2026',
-      '30 May 2026',
-      '01 Mar 2026',
-    ];
-    final source = trucks.isNotEmpty ? trucks : _demoTrucks();
-    return List.generate(
-      source.length,
-      (i) => InsuranceModel(
-        truckPlate: source[i].plate,
-        status: statuses[i % statuses.length],
-        expiryDate: expiries[i % expiries.length],
-        provider: providers[i % providers.length],
-      ),
-    );
+  static List<double> _demoEarningsSpots() {
+    final chartData = DemoData.earnings(period: 'weekly')['chartData'] as List;
+    return chartData
+        .map((e) => ((e as Map)['amount'] as num?)?.toDouble() ?? 0.0)
+        .toList();
   }
-
-  static List<double> _demoEarningsSpots() => [
-    42000,
-    58000,
-    35000,
-    71000,
-    63000,
-    80000,
-    55000,
-  ];
 
   void _pushAndRefresh(Widget screen) async {
     await Navigator.push(context, AppMotionRoute.fadeSlideScale(screen));

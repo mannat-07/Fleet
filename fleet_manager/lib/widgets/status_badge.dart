@@ -20,6 +20,8 @@ class StatusBadge extends StatelessWidget {
         return const Color(0xFF9E9E9E);
       case 'expired':
         return AppColors.red;
+      case 'pending':
+        return AppColors.blue;
       default:
         return const Color(0xFF9E9E9E);
     }

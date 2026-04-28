@@ -39,12 +39,16 @@ class _TrucksScreenState extends State<TrucksScreen> {
       final list = await ApiService.getTrucks();
       if (!mounted) return;
       AppStore.trucks = list.map(TruckModel.fromJson).toList();
+      if (AppStore.trucks.isEmpty) {
+        AppStore.trucks = DemoData.trucks();
+      }
       setState(() => _loading = false);
     } catch (e) {
       if (!mounted) return;
+      AppStore.trucks = DemoData.trucks();
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = null;
       });
     }
   }

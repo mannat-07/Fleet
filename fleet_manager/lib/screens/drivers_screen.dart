@@ -46,14 +46,18 @@ class _DriversScreenState extends State<DriversScreen>
       final list = await ApiService.getDrivers();
       if (!mounted) return;
       AppStore.drivers = list.map(DriverModel.fromJson).toList();
+      if (AppStore.drivers.isEmpty) {
+        AppStore.drivers = DemoData.drivers();
+      }
       setState(() => _loading = false);
       _controller.reset();
       _controller.forward();
     } catch (e) {
       if (!mounted) return;
+      AppStore.drivers = DemoData.drivers();
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = null;
       });
     }
   }
