@@ -27,11 +27,25 @@ app.use(cors({
 }));
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
+// ESP32 limiter must be registered BEFORE the global limiter so that
+// /api/esp32/* requests are counted against the generous sensor cap (120/min)
+// and never hit the tight global cap (100/15min).
+const esp32Limiter = rateLimit({
+  windowMs: 60 * 1000,  // 1-minute window
+  max:      120,         // 120 req/min — comfortably covers 1-second polling
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message: { success: false, message: 'ESP32 polling rate exceeded' },
+});
+app.use('/api/esp32/', esp32Limiter);
+
 const globalLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
   max:      parseInt(process.env.RATE_LIMIT_MAX)        || 100,
   standardHeaders: true,
   legacyHeaders:   false,
+  // Skip esp32 routes — they have their own limiter above
+  skip: (req) => req.path.startsWith('/api/esp32/'),
   message: { success: false, message: 'Too many requests, please try again later' },
 });
 app.use('/api/', globalLimiter);

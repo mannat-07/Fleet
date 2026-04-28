@@ -71,7 +71,7 @@ class _TruckSensorScreenState extends State<TruckSensorScreen>
   // Backend proxy endpoint — backend fetches from ESP32 on your behalf
   // since your PC is connected to the ESP32 WiFi, not the phone.
   static const String _sensorUrl = '/esp32/data';
-  static const Duration _pollInterval = Duration(seconds: 2);
+  static const Duration _pollInterval = Duration(seconds: 1);
 
   Timer? _timer;
   Esp32Data? _data;
