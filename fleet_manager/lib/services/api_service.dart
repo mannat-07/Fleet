@@ -92,9 +92,14 @@ class ApiService {
 
   // ── Trucks ───────────────────────────────────────────────────────────────────
 
-  static Future<List<Map<String, dynamic>>> getTrucks({String? status}) async {
+  static Future<List<Map<String, dynamic>>> getTrucks({String? status, bool includeMl = false}) async {
     try {
-      final path = status != null ? '/trucks?status=$status' : '/trucks';
+      var path = '/trucks';
+      final params = <String>[];
+      if (status != null) params.add('status=$status');
+      if (includeMl) params.add('ml=true');
+      if (params.isNotEmpty) path += '?${params.join('&')}';
+      
       final data = await _get(path);
       if (data == null) return [];
       return ((data as Map)['trucks'] as List? ?? [])
@@ -130,11 +135,27 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> updateTruckMetrics(
+    String truckId,
+    Map<String, dynamic> metrics,
+  ) async {
+    try {
+      return (await _patch('/trucks/$truckId/metrics', metrics)) as Map<String, dynamic>;
+    } catch (e) {
+      throw ApiException('Failed to update truck metrics: $e');
+    }
+  }
+
   // ── Drivers ──────────────────────────────────────────────────────────────────
 
-  static Future<List<Map<String, dynamic>>> getDrivers({String? status}) async {
+  static Future<List<Map<String, dynamic>>> getDrivers({String? status, bool includeMl = false}) async {
     try {
-      final path = status != null ? '/drivers?status=$status' : '/drivers';
+      var path = '/drivers';
+      final params = <String>[];
+      if (status != null) params.add('status=$status');
+      if (includeMl) params.add('ml=true');
+      if (params.isNotEmpty) path += '?${params.join('&')}';
+      
       final data = await _get(path);
       if (data == null) return [];
       return ((data as Map)['drivers'] as List? ?? [])
@@ -154,11 +175,31 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> updateDriverMetrics(
+    String driverId,
+    Map<String, dynamic> metrics,
+  ) async {
+    try {
+      return (await _patch('/drivers/$driverId/metrics', metrics)) as Map<String, dynamic>;
+    } catch (e) {
+      throw ApiException('Failed to update driver metrics: $e');
+    }
+  }
+
   static Future<void> deleteDriver(String driverId) async {
     try {
       await _delete('/drivers/$driverId');
     } catch (e) {
       throw ApiException('Failed to delete driver: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> assignDriver(String driverId, String truckId) async {
+    try {
+      return (await _post('/drivers/$driverId/assign', {'truckId': truckId}))
+          as Map<String, dynamic>;
+    } catch (e) {
+      throw ApiException('Failed to assign driver: $e');
     }
   }
 
@@ -314,6 +355,64 @@ class ApiService {
 
   static Future<List<Map<String, dynamic>>> getAllTrucks() async {
     return getTrucks();
+  }
+
+  // ── ML Predictions ───────────────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>?> predictDriverScore(String driverId) async {
+    try {
+      return (await _post('/ml/predict/driver', {'driverId': driverId}))
+          as Map<String, dynamic>?;
+    } catch (e) {
+      throw ApiException('Failed to predict driver score: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>?> predictTruckScore(String truckId) async {
+    try {
+      return (await _post('/ml/predict/truck', {'truckId': truckId}))
+          as Map<String, dynamic>?;
+    } catch (e) {
+      throw ApiException('Failed to predict truck score: $e');
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getDriverRecommendations() async {
+    try {
+      final data = await _get('/ml/recommendations/drivers');
+      if (data == null) return [];
+      return ((data as Map)['recommendations'] as List? ?? [])
+          .cast<Map<String, dynamic>>();
+    } catch (e) {
+      throw ApiException('Failed to load driver recommendations: $e');
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getTruckRecommendations() async {
+    try {
+      final data = await _get('/ml/recommendations/trucks');
+      if (data == null) return [];
+      return ((data as Map)['recommendations'] as List? ?? [])
+          .cast<Map<String, dynamic>>();
+    } catch (e) {
+      throw ApiException('Failed to load truck recommendations: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>?> trainDriverModel() async {
+    try {
+      return (await _post('/ml/train/driver', {})) as Map<String, dynamic>?;
+    } catch (e) {
+      throw ApiException('Failed to train driver model: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>?> trainTruckModel() async {
+    try {
+      return (await _post('/ml/train/truck', {})) as Map<String, dynamic>?;
+    } catch (e) {
+      throw ApiException('Failed to train truck model: $e');
+    }
   }
 }
 

@@ -19,6 +19,8 @@ async function addTruck({ ownerId, plate, model, type, year, driverId }) {
 
   const truckId = uuidv4();
   const now     = admin.firestore.FieldValue.serverTimestamp();
+  const currentYear = new Date().getFullYear();
+  const truckAge = year ? currentYear - year : 0;
 
   const truck = {
     truckId, ownerId,
@@ -30,6 +32,13 @@ async function addTruck({ ownerId, plate, model, type, year, driverId }) {
     assignedDriverId: driverId || null,
     lastLocation: null,
     lastSeen: null,
+    // ML Performance Metrics - initialized with defaults
+    maintenance_score:       90,   // Default: good maintenance
+    fuel_efficiency:         5.5,  // Default: average km/l
+    breakdown_count:         0,    // Default: no breakdowns yet
+    age_years:               truckAge,
+    total_trips:             0,    // Default: no trips yet
+    avg_load_capacity_used:  75,   // Default: 75% capacity usage
     createdAt: now, updatedAt: now,
   };
 
@@ -66,8 +75,9 @@ async function addTruck({ ownerId, plate, model, type, year, driverId }) {
 /**
  * @param {string} ownerId
  * @param {{ status?: string }} filters
+ * @param {boolean} includeMl - Whether to include ML predictions
  */
-async function getTrucks(ownerId, filters = {}) {
+async function getTrucks(ownerId, filters = {}, includeMl = false) {
   const db   = getDb();
   const snap = await db.collection(COLLECTIONS.TRUCKS)
     .where('ownerId', '==', ownerId)
@@ -84,6 +94,37 @@ async function getTrucks(ownerId, filters = {}) {
   // In-memory filter for idle trucks (avoids composite index)
   if (filters.status === 'idle') {
     trucks = trucks.filter(t => t.status === 'idle' && t.assignedDriverId === null);
+  }
+
+  // Add ML predictions if requested - use batch prediction for speed
+  if (includeMl && trucks.length > 0) {
+    const mlService = require('./mlService');
+    try {
+      const trucksWithFeatures = trucks.map(t => ({
+        id: t.truckId,
+        maintenance_score: t.maintenance_score || 90,
+        fuel_efficiency: t.fuel_efficiency || 5.5,
+        breakdown_count: t.breakdown_count || 0,
+        age_years: t.age_years || 0,
+        total_trips: t.total_trips || 0,
+        avg_load_capacity_used: t.avg_load_capacity_used || 75,
+      }));
+      
+      const predictions = await mlService.batchPredictTrucks(trucksWithFeatures);
+      
+      // Map predictions back to trucks
+      const predictionMap = new Map(predictions.map(p => [p.id, p.predicted_score]));
+      return trucks.map(truck => ({
+        ...truck,
+        predicted_score: predictionMap.get(truck.truckId) || null,
+      }));
+    } catch (err) {
+      // If ML fails, return trucks without predictions
+      return trucks.map(truck => ({
+        ...truck,
+        predicted_score: null,
+      }));
+    }
   }
 
   return trucks;
@@ -133,4 +174,46 @@ async function deleteTruck(truckId, ownerId) {
   await batch.commit();
 }
 
-module.exports = { addTruck, getTrucks, getTruckById, updateTruckStatus, deleteTruck };
+/**
+ * Update truck performance metrics for ML model
+ */
+async function updateTruckMetrics(truckId, ownerId, metrics) {
+  const db  = getDb();
+  const doc = await db.collection(COLLECTIONS.TRUCKS).doc(truckId).get();
+  if (!doc.exists) { const err = new Error('Truck not found'); err.statusCode = 404; throw err; }
+  if (doc.data().ownerId !== ownerId) { const err = new Error('Forbidden'); err.statusCode = 403; throw err; }
+
+  const allowedFields = [
+    'maintenance_score',
+    'fuel_efficiency',
+    'breakdown_count',
+    'age_years',
+    'total_trips',
+    'avg_load_capacity_used'
+  ];
+
+  const updates = {};
+  for (const field of allowedFields) {
+    if (metrics[field] !== undefined) {
+      const value = parseFloat(metrics[field]);
+      if (isNaN(value)) {
+        const err = new Error(`${field} must be a valid number`);
+        err.statusCode = 400;
+        throw err;
+      }
+      updates[field] = value;
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    const err = new Error('No valid metrics provided');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+  await doc.ref.update(updates);
+  return { truckId, ...updates };
+}
+
+module.exports = { addTruck, getTrucks, getTruckById, updateTruckStatus, deleteTruck, updateTruckMetrics };

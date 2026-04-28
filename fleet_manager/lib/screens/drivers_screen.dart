@@ -7,6 +7,7 @@ import '../widgets/status_badge.dart';
 import '../widgets/back_button_widget.dart';
 import '../widgets/glass_input.dart';
 import '../widgets/custom_button.dart';
+import '../widgets/driver_detail_dialog.dart';
 
 class DriversScreen extends StatefulWidget {
   const DriversScreen({super.key});
@@ -15,11 +16,15 @@ class DriversScreen extends StatefulWidget {
   State<DriversScreen> createState() => _DriversScreenState();
 }
 
+enum DriverSortType { none, mlBest, name, trips }
+
 class _DriversScreenState extends State<DriversScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   bool _loading = true;
   String? _error;
+  DriverSortType _sortType = DriverSortType.none;
+  List<Map<String, dynamic>> _driversWithPredictions = [];
 
   @override
   void initState() {
@@ -43,22 +48,158 @@ class _DriversScreenState extends State<DriversScreen>
       _error = null;
     });
     try {
-      final list = await ApiService.getDrivers();
+      // Request drivers WITH ML predictions
+      final list = await ApiService.getDrivers(includeMl: true);
       if (!mounted) return;
+      
+      // Store raw driver data with predictions
+      _driversWithPredictions = list;
+      
+      // Also update AppStore for compatibility
       AppStore.drivers = list.map(DriverModel.fromJson).toList();
-      if (AppStore.drivers.isEmpty) {
-        AppStore.drivers = DemoData.drivers();
-      }
+      
       setState(() => _loading = false);
       _controller.reset();
       _controller.forward();
+      
+      // Apply current sort
+      _applySorting();
     } catch (e) {
       if (!mounted) return;
-      AppStore.drivers = DemoData.drivers();
+      // NO DEMO DATA - show error instead
       setState(() {
         _loading = false;
-        _error = null;
+        _error = e.toString();
       });
+    }
+  }
+
+  Future<void> _applySorting() async {
+    if (_sortType == DriverSortType.mlBest) {
+      // Sort existing data by predicted_score (already loaded with ML predictions)
+      _driversWithPredictions.sort((a, b) {
+        final scoreA = (a['predicted_score'] ?? 0).toDouble();
+        final scoreB = (b['predicted_score'] ?? 0).toDouble();
+        return scoreB.compareTo(scoreA); // Descending order (best first)
+      });
+      AppStore.drivers = _driversWithPredictions.map(DriverModel.fromJson).toList();
+      setState(() {});
+    } else if (_sortType == DriverSortType.name) {
+      _driversWithPredictions.sort((a, b) => 
+        (a['name'] ?? '').toString().compareTo((b['name'] ?? '').toString())
+      );
+      AppStore.drivers = _driversWithPredictions.map(DriverModel.fromJson).toList();
+      setState(() {});
+    } else if (_sortType == DriverSortType.trips) {
+      _driversWithPredictions.sort((a, b) => 
+        ((b['trips_completed'] ?? 0) as int).compareTo((a['trips_completed'] ?? 0) as int)
+      );
+      AppStore.drivers = _driversWithPredictions.map(DriverModel.fromJson).toList();
+      setState(() {});
+    }
+  }
+
+  void _showSortMenu() {
+    final c = FleetTheme.of(context).colors;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: c.sheetBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: c.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text(
+              'Sort Drivers',
+              style: TextStyle(
+                color: c.text,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildSortOption(c, 'Best Performers (ML)', DriverSortType.mlBest, Icons.psychology),
+            _buildSortOption(c, 'Name (A-Z)', DriverSortType.name, Icons.sort_by_alpha),
+            _buildSortOption(c, 'Most Trips', DriverSortType.trips, Icons.local_shipping),
+            _buildSortOption(c, 'Default Order', DriverSortType.none, Icons.clear),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSortOption(FleetColors c, String label, DriverSortType type, IconData icon) {
+    final isSelected = _sortType == type;
+    return GestureDetector(
+      onTap: () {
+        Navigator.pop(context);
+        setState(() => _sortType = type);
+        if (type == DriverSortType.none) {
+          _loadDrivers();
+        } else {
+          _applySorting();
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.orangeStart.withOpacity(0.1) : c.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.orangeStart : c.cardBorder,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? AppColors.orangeStart : c.textSub,
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? AppColors.orangeStart : c.text,
+                  fontSize: 15,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                ),
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_circle, color: AppColors.orangeStart, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDriverDetail(Map<String, dynamic> driver) async {
+    final result = await showDialog(
+      context: context,
+      builder: (_) => DriverDetailDialog(driver: driver),
+    );
+    
+    // If result is true, it means a truck was assigned, so refresh the list
+    if (result == true) {
+      _loadDrivers();
     }
   }
 
@@ -242,6 +383,11 @@ class _DriversScreenState extends State<DriversScreen>
                     : '${AppStore.drivers.length} registered',
                 actions: [
                   HeaderIconBtn(
+                    icon: Icons.filter_list,
+                    onTap: _showSortMenu,
+                  ),
+                  const SizedBox(width: 8),
+                  HeaderIconBtn(
                     icon: Icons.person_add_alt_1,
                     onTap: _openAddSheet,
                   ),
@@ -297,7 +443,15 @@ class _DriversScreenState extends State<DriversScreen>
             ),
             child: _DriverCard(
               driver: AppStore.drivers[i],
+              driverData: _driversWithPredictions.isNotEmpty && i < _driversWithPredictions.length
+                  ? _driversWithPredictions[i]
+                  : null,
               c: c,
+              onTap: () {
+                if (_driversWithPredictions.isNotEmpty && i < _driversWithPredictions.length) {
+                  _showDriverDetail(_driversWithPredictions[i]);
+                }
+              },
               onEdit: () => _openEditSheet(AppStore.drivers[i]),
               onDelete: () => _confirmDelete(AppStore.drivers[i]),
             ),
@@ -310,124 +464,177 @@ class _DriversScreenState extends State<DriversScreen>
 
 class _DriverCard extends StatelessWidget {
   final DriverModel driver;
+  final Map<String, dynamic>? driverData;
   final FleetColors c;
-  final VoidCallback onEdit, onDelete;
+  final VoidCallback onTap, onEdit, onDelete;
+  
   const _DriverCard({
     required this.driver,
+    this.driverData,
     required this.c,
+    required this.onTap,
     required this.onEdit,
     required this.onDelete,
   });
 
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: c.isDark ? const Color(0x0DFFFFFF) : c.surface,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: c.cardBorder),
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF4FC3F7), Color(0xFF0288D1)],
-            ),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            driver.avatarInitials,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+  Widget build(BuildContext context) {
+    // Get ML predicted score from backend (0-100 scale)
+    final score = driverData?['predicted_score'];
+    
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: c.isDark ? const Color(0x0DFFFFFF) : c.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: c.cardBorder),
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                driver.name,
-                style: TextStyle(
-                  color: c.text,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4FC3F7), Color(0xFF0288D1)],
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                driver.avatarInitials,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 3),
-              if (driver.phone.isNotEmpty)
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          driver.name,
+                          style: TextStyle(
+                            color: c.text,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (score != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _getScoreColor(score.toDouble()).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.star,
+                                color: _getScoreColor(score.toDouble()),
+                                size: 12,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                score.toStringAsFixed(0),
+                                style: TextStyle(
+                                  color: _getScoreColor(score.toDouble()),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  if (driver.phone.isNotEmpty)
+                    Row(
+                      children: [
+                        Icon(Icons.phone_outlined, color: c.textSub, size: 12),
+                        const SizedBox(width: 4),
+                        Text(
+                          driver.phone,
+                          style: TextStyle(color: c.textSub, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 3),
+                  if (driver.assignedTruck.isNotEmpty)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.local_shipping_outlined,
+                          color: c.textSub,
+                          size: 12,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            driver.assignedTruck,
+                            style: TextStyle(color: c.textSub, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                StatusBadge(status: driver.status),
+                const SizedBox(height: 8),
                 Row(
                   children: [
-                    Icon(Icons.phone_outlined, color: c.textSub, size: 12),
-                    const SizedBox(width: 4),
-                    Text(
-                      driver.phone,
-                      style: TextStyle(color: c.textSub, fontSize: 12),
+                    GestureDetector(
+                      onTap: onEdit,
+                      child: Icon(
+                        Icons.edit_outlined,
+                        color: AppColors.blue.withOpacity(0.8),
+                        size: 18,
+                      ),
                     ),
-                  ],
-                ),
-              const SizedBox(height: 3),
-              if (driver.assignedTruck.isNotEmpty)
-                Row(
-                  children: [
-                    Icon(
-                      Icons.local_shipping_outlined,
-                      color: c.textSub,
-                      size: 12,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        driver.assignedTruck,
-                        style: TextStyle(color: c.textSub, fontSize: 12),
-                        overflow: TextOverflow.ellipsis,
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: onDelete,
+                      child: Icon(
+                        Icons.delete_outline,
+                        color: AppColors.red.withOpacity(0.7),
+                        size: 18,
                       ),
                     ),
                   ],
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            StatusBadge(status: driver.status),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: onEdit,
-                  child: Icon(
-                    Icons.edit_outlined,
-                    color: AppColors.blue.withOpacity(0.8),
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: onDelete,
-                  child: Icon(
-                    Icons.delete_outline,
-                    color: AppColors.red.withOpacity(0.7),
-                    size: 18,
-                  ),
                 ),
               ],
             ),
           ],
         ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
+
+  Color _getScoreColor(double score) {
+    if (score >= 80) return AppColors.green;
+    if (score >= 60) return AppColors.amber;
+    return AppColors.red;
+  }
 }
 
 class _DriverFormSheet extends StatefulWidget {

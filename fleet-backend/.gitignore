@@ -3,3 +3,13 @@ node_modules/
 *.log
 serviceAccountKey.json
 dist/
+
+# ML Models and Python
+ml/driver_model.pkl
+ml/truck_model.pkl
+ml/__pycache__/
+ml/venv/
+ml/.venv/
+ml/.env
+*.pyc
+__pycache__/

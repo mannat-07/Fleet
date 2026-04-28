@@ -14,6 +14,7 @@ router.get('/data', authenticate, (req, res) => {
     let raw = '';
     esp32Res.on('data', chunk => { raw += chunk; });
     esp32Res.on('end', () => {
+      if (res.headersSent) return;
       try {
         const json = JSON.parse(raw);
         res.json({ success: true, data: json });
@@ -24,6 +25,7 @@ router.get('/data', authenticate, (req, res) => {
   });
 
   request.on('timeout', () => {
+    if (res.headersSent) return;
     request.destroy();
     res.status(504).json({
       success: false,
@@ -32,6 +34,7 @@ router.get('/data', authenticate, (req, res) => {
   });
 
   request.on('error', (err) => {
+    if (res.headersSent) return;
     res.status(503).json({
       success: false,
       message: `Cannot reach ESP32 at ${ESP32_URL}. Connect your PC to "TruckSystem" WiFi. Error: ${err.message}`,
@@ -46,14 +49,20 @@ router.get('/data', authenticate, (req, res) => {
 router.get('/status', (req, res) => {
   const request = http.get(ESP32_URL, { timeout: 3000 }, (esp32Res) => {
     esp32Res.resume(); // drain response
-    res.json({ success: true, reachable: true, url: ESP32_URL });
+    if (!res.headersSent) {
+      res.json({ success: true, reachable: true, url: ESP32_URL });
+    }
   });
   request.on('timeout', () => {
     request.destroy();
-    res.json({ success: true, reachable: false, reason: 'timeout' });
+    if (!res.headersSent) {
+      res.json({ success: true, reachable: false, reason: 'timeout' });
+    }
   });
   request.on('error', (err) => {
-    res.json({ success: true, reachable: false, reason: err.message });
+    if (!res.headersSent) {
+      res.json({ success: true, reachable: false, reason: err.message });
+    }
   });
 });
 

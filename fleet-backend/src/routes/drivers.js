@@ -57,4 +57,19 @@ router.post('/:driverId/unassign',
   ctrl.unassignDriver
 );
 
+// PATCH /api/drivers/:driverId/metrics — Update ML performance metrics
+router.patch('/:driverId/metrics',
+  [
+    param('driverId').notEmpty(),
+    body('safety_score').optional().isFloat({ min: 0, max: 100 }),
+    body('on_time_delivery_rate').optional().isFloat({ min: 0, max: 100 }),
+    body('fuel_efficiency').optional().isFloat({ min: 0, max: 20 }),
+    body('alert_count').optional().isInt({ min: 0 }),
+    body('experience_years').optional().isFloat({ min: 0 }),
+    body('trips_completed').optional().isInt({ min: 0 }),
+  ],
+  validate,
+  ctrl.updateDriverMetrics
+);
+
 module.exports = router;

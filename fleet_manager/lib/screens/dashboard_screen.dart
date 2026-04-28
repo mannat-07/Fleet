@@ -12,6 +12,7 @@ import 'insurance_screen.dart';
 import 'earnings_screen.dart';
 import 'profile_screen.dart';
 import 'notifications_screen.dart';
+import 'ml_recommendations_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});

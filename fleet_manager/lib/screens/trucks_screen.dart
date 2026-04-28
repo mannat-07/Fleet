@@ -7,6 +7,7 @@ import '../widgets/back_button_widget.dart';
 import '../widgets/glass_input.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/motion.dart';
+import '../widgets/truck_detail_dialog.dart';
 import 'truck_sensor_screen.dart';
 
 class TrucksScreen extends StatefulWidget {
@@ -16,9 +17,13 @@ class TrucksScreen extends StatefulWidget {
   State<TrucksScreen> createState() => _TrucksScreenState();
 }
 
+enum TruckSortType { none, mlBest, plate, trips }
+
 class _TrucksScreenState extends State<TrucksScreen> {
   bool _loading = true;
   String? _error;
+  TruckSortType _sortType = TruckSortType.none;
+  List<Map<String, dynamic>> _trucksWithPredictions = [];
 
   @override
   void initState() {
@@ -37,21 +42,152 @@ class _TrucksScreenState extends State<TrucksScreen> {
       _error = null;
     });
     try {
-      final list = await ApiService.getTrucks();
+      // Request trucks WITH ML predictions
+      final list = await ApiService.getTrucks(includeMl: true);
       if (!mounted) return;
+      
+      // Store raw truck data with predictions
+      _trucksWithPredictions = list;
+      
+      // Also update AppStore for compatibility
       AppStore.trucks = list.map(TruckModel.fromJson).toList();
-      if (AppStore.trucks.isEmpty) {
-        AppStore.trucks = DemoData.trucks();
-      }
+      
       setState(() => _loading = false);
+      
+      // Apply current sort
+      _applySorting();
     } catch (e) {
       if (!mounted) return;
-      AppStore.trucks = DemoData.trucks();
+      // NO DEMO DATA - show error instead
       setState(() {
         _loading = false;
-        _error = null;
+        _error = e.toString();
       });
     }
+  }
+
+  Future<void> _applySorting() async {
+    if (_sortType == TruckSortType.mlBest) {
+      // Sort existing data by predicted_score (already loaded with ML predictions)
+      _trucksWithPredictions.sort((a, b) {
+        final scoreA = (a['predicted_score'] ?? 0).toDouble();
+        final scoreB = (b['predicted_score'] ?? 0).toDouble();
+        return scoreB.compareTo(scoreA); // Descending order (best first)
+      });
+      AppStore.trucks = _trucksWithPredictions.map(TruckModel.fromJson).toList();
+      setState(() {});
+    } else if (_sortType == TruckSortType.plate) {
+      _trucksWithPredictions.sort((a, b) => 
+        (a['plate'] ?? '').toString().compareTo((b['plate'] ?? '').toString())
+      );
+      AppStore.trucks = _trucksWithPredictions.map(TruckModel.fromJson).toList();
+      setState(() {});
+    } else if (_sortType == TruckSortType.trips) {
+      _trucksWithPredictions.sort((a, b) => 
+        ((b['total_trips'] ?? 0) as int).compareTo((a['total_trips'] ?? 0) as int)
+      );
+      AppStore.trucks = _trucksWithPredictions.map(TruckModel.fromJson).toList();
+      setState(() {});
+    }
+  }
+
+  void _showSortMenu() {
+    final c = FleetTheme.of(context).colors;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: c.sheetBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: c.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text(
+              'Sort Trucks',
+              style: TextStyle(
+                color: c.text,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildSortOption(c, 'Best Performers (ML)', TruckSortType.mlBest, Icons.psychology),
+            _buildSortOption(c, 'Plate Number', TruckSortType.plate, Icons.sort_by_alpha),
+            _buildSortOption(c, 'Most Trips', TruckSortType.trips, Icons.local_shipping),
+            _buildSortOption(c, 'Default Order', TruckSortType.none, Icons.clear),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSortOption(FleetColors c, String label, TruckSortType type, IconData icon) {
+    final isSelected = _sortType == type;
+    return GestureDetector(
+      onTap: () {
+        Navigator.pop(context);
+        setState(() => _sortType = type);
+        if (type == TruckSortType.none) {
+          _loadTrucks();
+        } else {
+          _applySorting();
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.orangeStart.withOpacity(0.1) : c.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.orangeStart : c.cardBorder,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? AppColors.orangeStart : c.textSub,
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? AppColors.orangeStart : c.text,
+                  fontSize: 15,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                ),
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_circle, color: AppColors.orangeStart, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTruckDetail(Map<String, dynamic> truck) {
+    showDialog(
+      context: context,
+      builder: (_) => TruckDetailDialog(truck: truck),
+    );
   }
 
   void _openAddSheet() {
@@ -133,7 +269,11 @@ class _TrucksScreenState extends State<TrucksScreen> {
                 subtitle: _loading
                     ? 'Loading…'
                     : '${AppStore.trucks.length} registered',
-                actions: [HeaderIconBtn(icon: Icons.add, onTap: _openAddSheet)],
+                actions: [
+                  HeaderIconBtn(icon: Icons.filter_list, onTap: _showSortMenu),
+                  const SizedBox(width: 8),
+                  HeaderIconBtn(icon: Icons.add, onTap: _openAddSheet),
+                ],
               ),
               Expanded(child: _buildBody(c)),
             ],
@@ -169,7 +309,15 @@ class _TrucksScreenState extends State<TrucksScreen> {
             delay: Duration(milliseconds: i * 80),
             child: _TruckCard(
               truck: AppStore.trucks[i],
+              truckData: _trucksWithPredictions.isNotEmpty && i < _trucksWithPredictions.length
+                  ? _trucksWithPredictions[i]
+                  : null,
               c: c,
+              onTap: () {
+                if (_trucksWithPredictions.isNotEmpty && i < _trucksWithPredictions.length) {
+                  _showTruckDetail(_trucksWithPredictions[i]);
+                }
+              },
               onEdit: () => _openEditSheet(AppStore.trucks[i]),
               onDelete: () => _confirmDelete(AppStore.trucks[i]),
               onSensor: () => Navigator.push(
@@ -189,150 +337,200 @@ class _TrucksScreenState extends State<TrucksScreen> {
 
 class _TruckCard extends StatelessWidget {
   final TruckModel truck;
+  final Map<String, dynamic>? truckData;
   final FleetColors c;
-  final VoidCallback onEdit, onDelete, onSensor;
+  final VoidCallback onTap, onEdit, onDelete, onSensor;
+  
   const _TruckCard({
     required this.truck,
+    this.truckData,
     required this.c,
+    required this.onTap,
     required this.onEdit,
     required this.onDelete,
     required this.onSensor,
   });
 
   @override
-  Widget build(BuildContext context) => FloatMotion(
-    child: PressScale(
-      onTap: onSensor,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: c.isDark ? const Color(0x0DFFFFFF) : c.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: c.cardBorder),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.orangeStart.withOpacity(c.isDark ? 0.1 : 0.08),
-              blurRadius: 20,
-              spreadRadius: 1,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Hero(
-              tag: 'truck-hero-${truck.id}',
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: AppColors.orangeGradient,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Breathing(
-                  child: Icon(
-                    Icons.local_shipping,
-                    color: Colors.white,
-                    size: 26,
+  Widget build(BuildContext context) {
+    // Get ML predicted score from backend (0-100 scale)
+    final score = truckData?['predicted_score'];
+    
+    return FloatMotion(
+      child: PressScale(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: c.isDark ? const Color(0x0DFFFFFF) : c.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: c.cardBorder),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.orangeStart.withOpacity(c.isDark ? 0.1 : 0.08),
+                blurRadius: 20,
+                spreadRadius: 1,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Hero(
+                tag: 'truck-hero-${truck.id}',
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.orangeGradient,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Breathing(
+                    child: Icon(
+                      Icons.local_shipping,
+                      color: Colors.white,
+                      size: 26,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    truck.plate,
-                    style: TextStyle(
-                      color: c.text,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${truck.model}  •  ${truck.type}',
-                    style: TextStyle(color: c.textSub, fontSize: 12),
-                  ),
-                  if (truck.location.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Row(
                       children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          color: c.textSub,
-                          size: 12,
-                        ),
-                        const SizedBox(width: 3),
                         Expanded(
                           child: Text(
-                            truck.location,
-                            style: TextStyle(color: c.textSub, fontSize: 11),
-                            overflow: TextOverflow.ellipsis,
+                            truck.plate,
+                            style: TextStyle(
+                              color: c.text,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
+                        if (score != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _getScoreColor(score.toDouble()).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.star,
+                                  color: _getScoreColor(score.toDouble()),
+                                  size: 12,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  score.toStringAsFixed(0),
+                                  style: TextStyle(
+                                    color: _getScoreColor(score.toDouble()),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                StatusBadge(status: truck.status),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    // IoT sensor button
-                    PressScale(
-                      onTap: onSensor,
-                      child: Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: AppColors.green.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: AppColors.green.withOpacity(0.3)),
-                        ),
-                        child: const Icon(
-                          Icons.sensors,
-                          color: AppColors.green,
-                          size: 16,
-                        ),
-                      ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${truck.model}  •  ${truck.type}',
+                      style: TextStyle(color: c.textSub, fontSize: 12),
                     ),
-                    const SizedBox(width: 8),
-                    PressScale(
-                      onTap: onEdit,
-                      child: Icon(
-                        Icons.edit_outlined,
-                        color: AppColors.blue.withOpacity(0.8),
-                        size: 18,
+                    if (truck.location.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            color: c.textSub,
+                            size: 12,
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              truck.location,
+                              style: TextStyle(color: c.textSub, fontSize: 11),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    PressScale(
-                      onTap: onDelete,
-                      child: Icon(
-                        Icons.delete_outline,
-                        color: AppColors.red.withOpacity(0.7),
-                        size: 18,
-                      ),
-                    ),
+                    ],
                   ],
                 ),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  StatusBadge(status: truck.status),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      // IoT sensor button
+                      PressScale(
+                        onTap: onSensor,
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: AppColors.green.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: AppColors.green.withOpacity(0.3)),
+                          ),
+                          child: const Icon(
+                            Icons.sensors,
+                            color: AppColors.green,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      PressScale(
+                        onTap: onEdit,
+                        child: Icon(
+                          Icons.edit_outlined,
+                          color: AppColors.blue.withOpacity(0.8),
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      PressScale(
+                        onTap: onDelete,
+                        child: Icon(
+                          Icons.delete_outline,
+                          color: AppColors.red.withOpacity(0.7),
+                          size: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
+  
+  Color _getScoreColor(double score) {
+    if (score >= 80) return AppColors.green;
+    if (score >= 60) return AppColors.amber;
+    return AppColors.red;
+  }
 }
 
 class _TruckFormSheet extends StatefulWidget {

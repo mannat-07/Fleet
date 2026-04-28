@@ -88,6 +88,13 @@ async function addDriver({ ownerId, name, phone, licenseNumber, licenseExpiry, e
     licenseExpiry:   licenseExpiry  || null,
     assignedTruckId: truckId        || null,
     status:          truckId ? 'on_trip' : 'available',
+    // ML Performance Metrics - initialized with defaults
+    safety_score:              85,  // Default: average safety
+    on_time_delivery_rate:     80,  // Default: average on-time rate
+    fuel_efficiency:           5.5, // Default: average km/l
+    alert_count:               0,   // Default: no alerts yet
+    experience_years:          0,   // Default: new driver
+    trips_completed:           0,   // Default: no trips yet
     createdAt:       now,
     updatedAt:       now,
   };
@@ -130,8 +137,9 @@ function _initials(name = '') {
 /**
  * @param {string} ownerId
  * @param {{ status?: string }} filters
+ * @param {boolean} includeMl - Whether to include ML predictions
  */
-async function getDrivers(ownerId, filters = {}) {
+async function getDrivers(ownerId, filters = {}, includeMl = false) {
   const db   = getDb();
   const snap = await db.collection(COLLECTIONS.DRIVERS)
     .where('ownerId', '==', ownerId)
@@ -148,6 +156,37 @@ async function getDrivers(ownerId, filters = {}) {
   // In-memory filter for available drivers (avoids composite index)
   if (filters.status === 'available') {
     drivers = drivers.filter(d => d.status === 'available' && d.assignedTruckId === null);
+  }
+
+  // Add ML predictions if requested - use batch prediction for speed
+  if (includeMl && drivers.length > 0) {
+    const mlService = require('./mlService');
+    try {
+      const driversWithFeatures = drivers.map(d => ({
+        id: d.driverId,
+        safety_score: d.safety_score || 85,
+        fuel_efficiency: d.fuel_efficiency || 5.5,
+        on_time_delivery_rate: d.on_time_delivery_rate || 80,
+        alert_count: d.alert_count || 0,
+        experience_years: d.experience_years || 0,
+        trips_completed: d.trips_completed || 0,
+      }));
+      
+      const predictions = await mlService.batchPredictDrivers(driversWithFeatures);
+      
+      // Map predictions back to drivers
+      const predictionMap = new Map(predictions.map(p => [p.id, p.predicted_score]));
+      return drivers.map(driver => ({
+        ...driver,
+        predicted_score: predictionMap.get(driver.driverId) || null,
+      }));
+    } catch (err) {
+      // If ML fails, return drivers without predictions
+      return drivers.map(driver => ({
+        ...driver,
+        predicted_score: null,
+      }));
+    }
   }
 
   return drivers;
@@ -241,4 +280,46 @@ async function deleteDriver(driverId, ownerId) {
   try { await admin.auth().deleteUser(uid || driverId); } catch (_) {}
 }
 
-module.exports = { addDriver, getDrivers, getDriverById, getDriverByUid, assignDriver, unassignDriver, deleteDriver };
+/**
+ * Update driver performance metrics for ML model
+ */
+async function updateDriverMetrics(driverId, ownerId, metrics) {
+  const db  = getDb();
+  const doc = await db.collection(COLLECTIONS.DRIVERS).doc(driverId).get();
+  if (!doc.exists) { const err = new Error('Driver not found'); err.statusCode = 404; throw err; }
+  if (doc.data().ownerId !== ownerId) { const err = new Error('Forbidden'); err.statusCode = 403; throw err; }
+
+  const allowedFields = [
+    'safety_score',
+    'on_time_delivery_rate',
+    'fuel_efficiency',
+    'alert_count',
+    'experience_years',
+    'trips_completed'
+  ];
+
+  const updates = {};
+  for (const field of allowedFields) {
+    if (metrics[field] !== undefined) {
+      const value = parseFloat(metrics[field]);
+      if (isNaN(value)) {
+        const err = new Error(`${field} must be a valid number`);
+        err.statusCode = 400;
+        throw err;
+      }
+      updates[field] = value;
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    const err = new Error('No valid metrics provided');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  updates.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+  await doc.ref.update(updates);
+  return { driverId, ...updates };
+}
+
+module.exports = { addDriver, getDrivers, getDriverById, getDriverByUid, assignDriver, unassignDriver, deleteDriver, updateDriverMetrics };

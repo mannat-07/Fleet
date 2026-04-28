@@ -46,4 +46,19 @@ router.delete('/:truckId',
   ctrl.deleteTruck
 );
 
+// PATCH /api/trucks/:truckId/metrics — Update ML performance metrics
+router.patch('/:truckId/metrics',
+  [
+    param('truckId').notEmpty(),
+    body('maintenance_score').optional().isFloat({ min: 0, max: 100 }),
+    body('fuel_efficiency').optional().isFloat({ min: 0, max: 20 }),
+    body('breakdown_count').optional().isInt({ min: 0 }),
+    body('age_years').optional().isFloat({ min: 0 }),
+    body('total_trips').optional().isInt({ min: 0 }),
+    body('avg_load_capacity_used').optional().isFloat({ min: 0, max: 100 }),
+  ],
+  validate,
+  ctrl.updateTruckMetrics
+);
+
 module.exports = router;

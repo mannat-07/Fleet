@@ -15,6 +15,7 @@ const aggregationRoutes  = require('./routes/aggregation');
 const insuranceRoutes    = require('./routes/insurance');
 const notificationRoutes = require('./routes/notifications');
 const esp32Routes        = require('./routes/esp32');
+const mlRoutes           = require('./routes/ml');
 const app = express();
 
 // ─── Security ────────────────────────────────────────────────────────────────
@@ -65,6 +66,7 @@ app.use('/api/fleet',         aggregationRoutes);
 app.use('/api/insurance',     insuranceRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/esp32',         esp32Routes);
+app.use('/api/ml',            mlRoutes);
 
 // ─── Error handling ───────────────────────────────────────────────────────────
 app.use(notFoundHandler);

@@ -20,7 +20,8 @@ async function deleteDriver(req, res, next) {
 async function getDrivers(req, res, next) {
   try {
     const filters = req.query.status ? { status: req.query.status } : {};
-    const drivers = await driverService.getDrivers(req.user.uid, filters);
+    const includeMl = req.query.ml === 'true';
+    const drivers = await driverService.getDrivers(req.user.uid, filters, includeMl);
     return success(res, { drivers, count: drivers.length });
   } catch (err) { next(err); }
 }
@@ -74,4 +75,11 @@ async function unassignDriver(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { addDriver, getDrivers, getDriver, getMyProfile, assignDriver, unassignDriver, deleteDriver };
+async function updateDriverMetrics(req, res, next) {
+  try {
+    const result = await driverService.updateDriverMetrics(req.params.driverId, req.user.uid, req.body);
+    return success(res, result, 'Driver metrics updated');
+  } catch (err) { next(err); }
+}
+
+module.exports = { addDriver, getDrivers, getDriver, getMyProfile, assignDriver, unassignDriver, deleteDriver, updateDriverMetrics };
