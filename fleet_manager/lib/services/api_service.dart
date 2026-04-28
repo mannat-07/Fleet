@@ -226,7 +226,35 @@ class ApiService {
     return getDrivers(status: 'available');
   }
 
-  // ── Fleet summary (owner dashboard) ─────────────────────────────────────────
+  // ── ESP32 Sensor Proxy ────────────────────────────────────────────────────
+
+  /// Fetches live ESP32 sensor data via the backend proxy.
+  /// The backend must be running on a PC connected to the ESP32 "TruckSystem" WiFi.
+  static Future<Map<String, dynamic>> getEsp32Data() async {
+    try {
+      final data = await _get('/esp32/data');
+      if (data == null) throw ApiException('No data from ESP32');
+      return data as Map<String, dynamic>;
+    } catch (e) {
+      throw ApiException('ESP32 data unavailable: $e');
+    }
+  }
+
+  static Future<bool> checkEsp32Status() async {
+    try {
+      final headers = await _headers();
+      final response = await http
+          .get(Uri.parse('$baseUrl/esp32/status'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final b = json.decode(response.body);
+        return b['data']?['reachable'] == true || b['reachable'] == true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
 
   static Future<Map<String, dynamic>?> getFleetSummary() async {
     try {

@@ -14,6 +14,7 @@ const iotRoutes          = require('./routes/iot');
 const aggregationRoutes  = require('./routes/aggregation');
 const insuranceRoutes    = require('./routes/insurance');
 const notificationRoutes = require('./routes/notifications');
+const esp32Routes        = require('./routes/esp32');
 const app = express();
 
 // ─── Security ────────────────────────────────────────────────────────────────
@@ -63,6 +64,7 @@ app.use('/api/iot',           iotRoutes);
 app.use('/api/fleet',         aggregationRoutes);
 app.use('/api/insurance',     insuranceRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/esp32',         esp32Routes);
 
 // ─── Error handling ───────────────────────────────────────────────────────────
 app.use(notFoundHandler);

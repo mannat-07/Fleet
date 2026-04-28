@@ -7,6 +7,7 @@ import '../widgets/back_button_widget.dart';
 import '../widgets/glass_input.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/motion.dart';
+import 'truck_sensor_screen.dart';
 
 class TrucksScreen extends StatefulWidget {
   const TrucksScreen({super.key});
@@ -171,6 +172,13 @@ class _TrucksScreenState extends State<TrucksScreen> {
               c: c,
               onEdit: () => _openEditSheet(AppStore.trucks[i]),
               onDelete: () => _confirmDelete(AppStore.trucks[i]),
+              onSensor: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      TruckSensorScreen(truck: AppStore.trucks[i]),
+                ),
+              ),
             ),
           );
         },
@@ -182,18 +190,19 @@ class _TrucksScreenState extends State<TrucksScreen> {
 class _TruckCard extends StatelessWidget {
   final TruckModel truck;
   final FleetColors c;
-  final VoidCallback onEdit, onDelete;
+  final VoidCallback onEdit, onDelete, onSensor;
   const _TruckCard({
     required this.truck,
     required this.c,
     required this.onEdit,
     required this.onDelete,
+    required this.onSensor,
   });
 
   @override
   Widget build(BuildContext context) => FloatMotion(
     child: PressScale(
-      onTap: onEdit,
+      onTap: onSensor,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -279,6 +288,25 @@ class _TruckCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
+                    // IoT sensor button
+                    PressScale(
+                      onTap: onSensor,
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: AppColors.green.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: AppColors.green.withOpacity(0.3)),
+                        ),
+                        child: const Icon(
+                          Icons.sensors,
+                          color: AppColors.green,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     PressScale(
                       onTap: onEdit,
                       child: Icon(
